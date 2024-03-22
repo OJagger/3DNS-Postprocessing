@@ -35,7 +35,7 @@ function h = slice2schlierenVortOverlay(slice, blk, fpath, lims, area, aspect)
 
     set(ax2, 'Position', get(ax1, 'Position'));
 
-    if fpath ~= ''
+    if ~strcmp(fpath,'')
         exportgraphics(h, fpath, 'Resolution', 600);
     end
 end

@@ -1,8 +1,11 @@
-function blkNodes = writeFluentMesh(path, blk, next_block, next_patch, boundaries, iWrite)
+function blkNodes = writeFluentMesh(path, blk, boundaries, iWrite)
 
     if nargin < 5
         iWrite = true;
     end
+
+    next_block = blk.next_block;
+    next_patch = blk.next_patch;
     
     NB = length(blk.x);
     

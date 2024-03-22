@@ -99,6 +99,21 @@ classdef DNS_cascade < DNS_case
 
         end
 
+        function mu_ref = set_Re_c(obj, Re)
+
+            rgas = obj.gas.cp * (1 - 1/obj.gas.gam);
+            cut = kCut(obj.blk, obj.gas, obj.bcs);
+            M1 = M_p0T0V(obj.bcs.Poin, obj.bcs.Toin, obj.bcs.vin);
+            T1 = obj.bcs.Toin * T_T0(M1, obj.gas.gam);
+            ro0 = obj.bcs.Poin/(rgas * obj.bcs.Toin);
+            ro1 = ro0 * ro_ro0(M1, obj.gas.gam);
+
+            mu1 = ro1*obj.bcs.vin*cut.c / Re;
+            mu_ref = sutherland_mu_ref(mu1, T1);
+
+
+        end
+
 
 
 

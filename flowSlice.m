@@ -27,13 +27,13 @@ classdef flowSlice < handle
 %         vortZ;          % Z vorticity
     end
 
-    properties (Dependent = true)
+    properties (Dependent = true, Hidden = true)
         T;             % Temperature
         p;             % p stat
-        mut;            % Turbulent viscosity
         StR;            % Strain rate magnitude
         M;              % Mach No
         s;              % Entropy ( cp*log(T/300) - R*log(p/1e5) )
+        sfunc;
         ros;            % Entropy per unit volume
         vel;            % Velocity
         mu;             % Viscosity
@@ -93,14 +93,6 @@ classdef flowSlice < handle
             obj.set_ros(value)
         end
 
-        function value = get.mut(obj)
-            value = obj.get_mut;
-        end
-
-        function obj = set.mut(obj, value)
-            obj.set_mut(value);
-        end
-
         function value = get.StR(obj)
             value = obj.get_StR;
         end
@@ -116,21 +108,11 @@ classdef flowSlice < handle
         function set_T(obj,value)
         end
 
-        function set_mut(obj,value)
-        end
-
         function set_StR(obj,value)
         end
 
         function set_ros(obj,value)
         end
-
-
-        function value = get_mut(obj)
-            disp('Overload get_mut in relevant subclass')
-            value = [];
-        end
-
 
         function value = get_T(obj)
             value = cell(1,obj.NB);
@@ -188,6 +170,15 @@ classdef flowSlice < handle
 
         function value = get.s(obj)
             disp('Calculating s')
+            value = cell(1,obj.NB);
+            for nb = 1:obj.NB
+                pnow = (obj.gas.gam - 1)*(obj.Et{nb} - 0.5*(obj.u{nb}.^2 + obj.v{nb}.^2 + obj.w{nb}.^2).*obj.ro{nb});
+                Tnow = pnow./(obj.ro{nb}*obj.gas.rgas);
+                value{nb} = obj.gas.cp*log(Tnow/obj.bcs.Toin) - obj.gas.rgas*log(pnow/obj.bcs.Poin);
+            end
+        end
+
+        function value = get.sfunc(obj)
             value = cell(1,obj.NB);
             for nb = 1:obj.NB
                 pnow = (obj.gas.gam - 1)*(obj.Et{nb} - 0.5*(obj.u{nb}.^2 + obj.v{nb}.^2 + obj.w{nb}.^2).*obj.ro{nb});
@@ -295,22 +286,41 @@ classdef flowSlice < handle
         
 
         function value = get.St_an(obj)
+
+            S = obj.St;
+
             for ib = 1:obj.NB
 
-                [DUDX,DUDY] = gradHO(obj.blk.x{ib},obj.blk.y{ib},obj.u{ib});
-                [DVDX,DVDY] = gradHO(obj.blk.x{ib},obj.blk.y{ib},obj.v{ib});
+                tr = S{ib}(:,:,1,1) + S{ib}(:,:,2,2) + S{ib}(:,:,3,3);
 
-                %Traceless strain tensor
-                S = zeros(obj.blk.blockdims(ib,1),obj.blk.blockdims(ib,2),3,3);
-                
-                S(:,:,1,1) = 2*DUDX/3 - DVDY/3;
-                S(:,:,2,2) = 2*DVDY/3 - DUDX/3;
-                S(:,:,3,3) = -(DUDX+DVDY)/3;
+                St = S{ib};
+                for i=1:3
+                    St(:,:,i,i) = St(:,:,i,i) - tr/3;
+                end
 
-                S(:,:,1,2) = 0.5*(DUDY+DVDX);
-                S(:,:,2,1) = S(:,:,1,2);
+                value{ib} = St;
 
-                value{ib} = S;
+%                 [DUDX,DUDY] = gradHO(obj.blk.x{ib},obj.blk.y{ib},obj.u{ib});
+%                 [DVDX,DVDY] = gradHO(obj.blk.x{ib},obj.blk.y{ib},obj.v{ib});
+% 
+%                 %Traceless strain tensor
+%                 S = zeros(obj.blk.blockdims(ib,1),obj.blk.blockdims(ib,2),3,3);
+%                 
+%                 S(:,:,1,1) = 2*DUDX/3 - DVDY/3;
+%                 S(:,:,2,2) = 2*DVDY/3 - DUDX/3;
+%                 S(:,:,3,3) = -(DUDX+DVDY)/3;
+% 
+%                 S(:,:,1,2) = 0.5*(DUDY+DVDX);
+%                 S(:,:,2,1) = S(:,:,1,2);
+
+            end
+        end
+
+        function value = St_an2(obj)
+
+            S = obj.St_an;
+            for ib = 1:obj.NB
+                value{ib} = sum(sum(S{ib}.*S{ib},4),3);
             end
         end
 

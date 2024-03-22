@@ -6,6 +6,7 @@ classdef RANSSlice < aveSlice
         %blk;
         StR_store;            % Strain rate
         mut_store;            % Eddy viscosity
+        Pr_store;
 %         StR;
 %         mut;
         k;
@@ -15,9 +16,10 @@ classdef RANSSlice < aveSlice
         trans;          % Transition model on/off
         mod;            % beta1 modification on/off
         beta1_fac;
+        metadata;
     end
 
-    properties (Dependent = true)
+    properties (Dependent = true, Hidden = true)
         Pr;             % Turbulence production
         Pr_dist;
     end
@@ -223,29 +225,34 @@ classdef RANSSlice < aveSlice
         end
 
         function value = get.Pr(obj)
-            disp('Calculating Pr')
             value = cell(1,obj.NB);
-            if ~isempty(obj.StR_store)
+            if ~isempty(obj.Pr_store)
+                disp('Using stored Pr')
+                value = obj.Pr_store;
+            elseif ~isempty(obj.mut_store)
+                disp('Calculating Pr: using stored mut')
                 for nb = 1:obj.NB
-                    value{nb} = obj.mut_store{nb}.*obj.StR_store{nb}.^2;
+                    value{nb} = obj.mut_store{nb}.*obj.StR{nb}.^2;
     %                 [DUDX,DUDY] = gradHO(obj.blk.x{nb},obj.blk.y{nb},obj.u{nb});
     %                 [DVDX,DVDY] = gradHO(obj.blk.x{nb},obj.blk.y{nb},obj.v{nb});
                     %value{nb} = (obj.mut{nb}.*DUDX.^2 + obj.mut{nb}.*(DUDY.^2+DVDX.^2) + obj.mut{nb}.*DVDY.^2);
                 end
             else
-               value = obj.mut_koSST;
+                disp('Calculating Pr with k-om SST formulation')
+                value = obj.mut_koSST;
             end
 
         end
 
         function value = get_StR(obj)
-            disp('Calculatimg strain rate magnitude')
             if isempty(obj.StR_store)
                 value = cell(1,obj.NB);
                 for nb =1:obj.NB
+                    disp('Calculating strain rate magnitude')
                     value{nb} = strain_rate_magnitude(obj.blk.x{nb}, obj.blk.y{nb}, obj.u{nb}, obj.v{nb});
                 end
             else
+                disp('Using stored strain rate magnitude')
                 value = obj.StR_store;
             end
         end

@@ -1,9 +1,9 @@
 function write_input_files(casename,blk,bcs,gas,solver,varargin)
 nargin;
 p = inputParser;
-addOptional(p,'topology',[]);
-addOptional(p,'nkproc',[]);
-addOptional(p,'casetype','both');
+addParameter(p,'topology',[]);
+addParameter(p,'nkproc',[]);
+addParameter(p,'casetype','both');
 parse(p,varargin{:});
 casetype = p.Results.casetype;
 nkproc = p.Results.nkproc;

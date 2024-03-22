@@ -1,6 +1,6 @@
 function s = HYDRA_csv2structured(basecase, fname, beta1_fac)
-    % tecfile = '/Data/ojj23/dns-work/channel-flows/RANS/M1-2_Re2k2-bsl/tecplot.dat';
-    %[zone, VARlist] = tec2mat(tecfile,'debug');
+    tecfile = '/Data/ojj23/dns-work/channel-flows/RANS/M1-2_Re2k2-bsl/tecplot.dat';
+    [zone, VARlist] = tec2mat(tecfile,'debug');
 
     if nargin < 3
         beta1 = [];
@@ -12,8 +12,8 @@ function s = HYDRA_csv2structured(basecase, fname, beta1_fac)
     
 
     s = RANSSlice(blk,gas,bcs);
-%     s.blk = basecase.blk;
-%     s.gas = basecase.gas;
+    s.blk = basecase.blk;
+    s.gas = basecase.gas;
     s.beta1_fac = beta1_fac;
     gam  = gas.gam;
 

@@ -9,14 +9,15 @@ classdef aveSlice < kCut
         muinf;
         Tinf;
         T0in;
-        dsdyThresh = -50;
+        dsdyThresh;% = -50;
         use_unsflo = false;
         blEdgeMode;
         iSmoothBL =  false;
         nSmooth;
+        label;
     end
 
-    properties (Dependent = true)
+    properties (Dependent = true, Hidden = true)
         Msurf;          % Surface Mach No
         Psurf;
         theta;          % Momentum thickness
@@ -59,6 +60,8 @@ classdef aveSlice < kCut
         alpha2;
         p0out;
         yplus;
+        mut;            % Turbulent viscosity
+        mut_ratio;
     end
 
     methods
@@ -72,7 +75,7 @@ classdef aveSlice < kCut
             if nargin < 3
                 is = 40:100;
             end
-            if nargin < 2
+            if nargin < 2 || isempty(inlet_blocks)
                 inlet_blocks = obj.blk.inlet_blocks{1};
             end
             Mnow = obj.M;
@@ -144,6 +147,18 @@ classdef aveSlice < kCut
             value = y;
         end
 
+        function value = smooth_dist(obj, prop, nsmooth)
+
+            if nargin < 3 || isempty(nsmooth)
+                nsmooth = obj.nSmooth;
+            end
+            
+            nans = isnan(prop);
+            value = smooth(prop, nsmooth, 'rloess');
+            value(nans) = NaN;
+
+        end
+
         function value = get.dsdy(obj)
             %s = obj.oGridProp('s');
 
@@ -178,7 +193,11 @@ classdef aveSlice < kCut
 
         function value = BLedgeInd(obj, mode)
             if nargin < 2 || isempty(mode)
-                mode = "sThresh";
+                if ~isempty(obj.blEdgeMode)
+                    mode = obj.blEdgeMode;
+                else
+                    mode = "sCombined";
+                end
             end
             u = obj.oGridProp('U');
             fprintf('BL edge detection mode: %s\n',mode)
@@ -186,9 +205,14 @@ classdef aveSlice < kCut
                 case "sGradThresh"
                     temp = obj.dsdy;
                     for i=1:size(temp,1)
-                        j=size(temp,2);
-                        while temp(i,j) > obj.dsdyThresh && j>1
-                            j = j-1;
+                        j=1;
+                        if isempty(obj.dsdyThresh)
+                            thresh = 0.02*temp(i,1);% + 0.98*(temp(i,ceil(size(temp,2)/2))-temp(i,1));
+                        else
+                            thresh = obj.dsdyThresh;
+                        end
+                        while temp(i,j) < thresh && j<size(temp,2)
+                            j = j+1;
                         end
                         value(i) = min(j+1,size(temp,2));
                         [~, value(i)] = max(u(i,1:value(i)));
@@ -196,17 +220,43 @@ classdef aveSlice < kCut
                 case "sThresh"
                     temp = obj.oGridProp('s');
                     for i=1:size(temp,1)
-                        j=size(temp,2);
+                        if i==1255
+                            disp('')
+                        end
+%                         j=size(temp,2);
+                        j=1;
                         se = temp(i,end);
                         sw = temp(i,1);
                         se;
-                        while temp(i,j) < se + 0.02*(sw-se) && j>1
-                            j = j-1;
+                        while temp(i,j) > se + 0.02*(sw-se) && j<size(temp,2)
+                            j = j+1;
                         end
                         value(i) = min(j+1,size(temp,2));
                         %[~, value(i)] = max(u(i,1:value(i)));
                     end
+                case "sCombined"
+                    snow = obj.oGridProp('s');
+                    dsdy = obj.dsdy;
+                    for i=1:size(snow,1)
 
+                        sthresh  = 0.02*max(abs(snow(i,:)));
+                        
+                        if isempty(obj.dsdyThresh)
+                            dsdythresh = -0.02*max(abs(dsdy(i,:)));% + 0.98*(temp(i,ceil(size(temp,2)/2))-temp(i,1));
+                        else
+                            dsdythresh = obj.dsdyThresh;
+                        end
+
+                        j=1;
+                        while (snow(i,j) > sthresh || dsdy(i,j) < dsdythresh) && j<size(snow,2)
+                            j = j+1;
+                        end
+                        value(i) = min(j+1,size(snow,2));
+%                         if value(i) == 2
+%                             value(i) = NaN;
+%                         end
+                        
+                    end
                 case "unsflo"
                     del99 = obj.delta99("unsflo");
                     for i=1:length(del99)
@@ -232,13 +282,18 @@ classdef aveSlice < kCut
                     end
             end
             if obj.iSmoothBL
-                value = obj.smooth_bl_edge(obj.xSurf,value);
+                value = round(obj.smooth_dist(value));
             end
+            
         end
 
         function [xedge, yedge] = getBLedgeCoords(obj,mode)
-            if nargin < 2
-                mode = "sGradThresh";
+            if nargin < 2 || isempty(mode)
+                if ~isempty(obj.blEdgeMode)
+                    mode = obj.blEdgeMode;
+                else
+                    mode = "sCombined";
+                end
             end
             inds = obj.BLedgeInd(mode);
             for i=1:length(inds)
@@ -249,8 +304,8 @@ classdef aveSlice < kCut
 
         function value = get.iPS(obj)
             x = obj.xSurf;
-            M = smooth(obj.Msurf, obj.nSmooth);
-            pr = smooth(obj.blPr, obj.nSmooth);
+            M = obj.smooth_dist(obj.Msurf);
+            pr = obj.smooth_dist(obj.blPr);
 
             i = length(x);
             while M(i) < 1.02
@@ -270,7 +325,7 @@ classdef aveSlice < kCut
 
         function value = get.iEq(obj)
             i = 20;
-            pr = smooth(obj.blPr, obj.nSmooth);
+            pr = obj.smooth_dist(obj.blPr);
             while pr(i) > pr(i-1)
                 i = i+1;
             end
@@ -283,8 +338,12 @@ classdef aveSlice < kCut
         end
 
         function value = delta99(obj, mode)
-            if nargin < 2
-                mode = "sThresh";
+            if nargin < 2 || isempty(mode)
+                if ~isempty(obj.blEdgeMode)
+                    mode = obj.blEdgeMode;
+                else
+                    mode = "sCombined";
+                end
             end
             switch mode
                 case "sGradThresh"
@@ -325,8 +384,13 @@ classdef aveSlice < kCut
                     for i=1:size(obj.yBL,1)
                         value(i) = obj.yBL(i,inds(i));
                     end
+                case "sCombined"
+                    inds = obj.BLedgeInd("sCombined");
+                    for i=1:size(obj.yBL,1)
+                        value(i) = obj.yBL(i,inds(i));
+                    end
             end
-            value = smooth(value,obj.nSmooth);
+            value = obj.smooth_dist(value);
             
         end
 
@@ -357,7 +421,7 @@ classdef aveSlice < kCut
                 ys = obj.yBL(i,1:inds(i));
                 value(i) = trapz(ys, integrand);
             end
-            value = smooth(value,obj.nSmooth);
+            value = obj.smooth_dist(value);
         end
 
         function value = get.delStar_k(obj)
@@ -369,7 +433,7 @@ classdef aveSlice < kCut
                 ys = obj.yBL(i,1:inds(i));
                 value(i) = trapz(ys, integrand);
             end
-            value = smooth(value,obj.nSmooth);
+            value = obj.smooth_dist(value);
         end
 
         function value = get.delRho(obj)
@@ -385,7 +449,7 @@ classdef aveSlice < kCut
                 ys = obj.yBL(i,1:inds(i));
                 value(i) = trapz(ys, integrand);
             end
-            value = smooth(value,obj.nSmooth);
+            value = obj.smooth_dist(value);
         end
 
         function value = get.theta(obj)
@@ -401,7 +465,7 @@ classdef aveSlice < kCut
                 ys = obj.yBL(i,1:inds(i));
                 value(i) = trapz(ys, integrand);
             end
-            value = smooth(value,obj.nSmooth);
+            value = obj.smooth_dist(value);
         end
 
         function value = get.theta_k(obj)
@@ -414,7 +478,7 @@ classdef aveSlice < kCut
                 ys = obj.yBL(i,1:inds(i));
                 value(i) = trapz(ys, integrand);
             end
-            value = smooth(value,obj.nSmooth);
+            value = obj.smooth_dist(value);
         end
 
         function value = get.thetaStar(obj)
@@ -430,7 +494,7 @@ classdef aveSlice < kCut
                 ys = obj.yBL(i,1:inds(i));
                 value(i) = trapz(ys, integrand);
             end
-            value = smooth(value,obj.nSmooth);
+            value = obj.smooth_dist(value);
         end
 
         function value = get.H(obj)
@@ -479,26 +543,7 @@ classdef aveSlice < kCut
             value = obj.ssurf*obj.Uinf*obj.roinf/obj.muinf;
         end
 
-        function plot_BL_profile(obj,x,prop,ax)
-            if nargin < 4 || isempty(ax)
-                ax = gca;
-                disp('Creating axes')
-            end
 
-            [q, i] = BLprof(obj,x,prop);
-            size(q);
-            q = q/max(q);
-            BLinds = obj.BLedgeInd;
-            if string(prop) == "dsdy"
-                plot(ax, q, obj.yBL(i,:))
-                hold on
-                scatter(ax, q(BLinds(i)), obj.yBL(i,BLinds(i)))
-            else
-                plot(ax, q, obj.yBL(i,:)/obj.yBL(i,end))
-                %hold on
-                %scatter(ax, q(BLinds(i)), obj.yBL(i,BLinds(i))/obj.yBL(i,end))
-            end
-        end
 
         function plt = blDevPlot(obj, prop, varargin) % ax, lims, xrange, fmt)
 
@@ -508,6 +553,7 @@ classdef aveSlice < kCut
             defaultAx = gca;
             defaultLims = 'auto';
             defaultLineWidth = 1.5;
+            defaultFontSize = 12;
             defaultFmtString = '';
             defaultXRange = [x0-1 x1+1];
 
@@ -519,6 +565,7 @@ classdef aveSlice < kCut
             addParameter(p, 'xrange', defaultXRange);
             addParameter(p, 'fmt', defaultFmtString);
             addParameter(p, 'LineWidth', defaultLineWidth);
+            addParameter(p, 'FontSize', defaultFontSize)
 
             parse(p, varargin{:})
 
@@ -534,6 +581,7 @@ classdef aveSlice < kCut
                 p.Results.fmt, ...                                                                      % Set format string
                 'LineWidth', p.Results.LineWidth);                                                       % Set line width
 
+            set(ax,'FontSize',p.Results.FontSize)
 
             xlim([x0 x1])
             ylim(p.Results.lims)                                                                        % Set y lims
@@ -556,6 +604,176 @@ classdef aveSlice < kCut
             disp('')
         end
 
+        function [f] = plot_BL_summary(obj, varargin)
+
+            x0 = min(obj.xSurf);
+            x1 = max(obj.xSurf);
+
+            defaultLims = 'auto';
+            defaultLineWidth = 1.5;
+            defaultFmtString = '';
+            defaultXRange = [x0-1 x1+1];
+            if ~isempty(obj.label)
+                defaultLabel = obj.label;
+            else
+                defaultLabel = [];
+            end
+
+            p = inputParser;
+
+%             addRequired(p, 'prop');
+            addParameter(p, 'fig', []);
+            addParameter(p, 'lims', defaultLims);
+            addParameter(p, 'xrange', defaultXRange);
+            addParameter(p, 'loopxrange', []);
+            addParameter(p, 'ploteq', false);
+            addParameter(p, 'fmt', defaultFmtString);
+            addParameter(p, 'LineWidth', defaultLineWidth);
+            addParameter(p, 'label', defaultLabel);
+            addParameter(p, 'ColorOrderIndex',[]);
+            addParameter(p, 'FontSize', 12)
+            addParameter(p, 'title', [])
+
+            parse(p, varargin{:});
+
+            if isempty(p.Results.fig)
+                f = figure;
+                t = tiledlayout(3,3,'TileSpacing','tight');
+            else
+                f = p.Results.fig;
+                figure(f);
+                if isempty(f.Children)
+                    t = tiledlayout(3,3,'TileSpacing','tight');
+                else
+                    t = f.Children;
+                end
+            end
+
+            if isempty(p.Results.loopxrange)
+                loopxrange = p.Results.xrange;
+            else
+                loopxrange = p.Results.loopxrange;
+            end
+    
+
+            % Surface isentropic Mach number
+            nexttile(1)
+            a = gca;
+            if ~isempty(p.Results.ColorOrderIndex)
+                a.ColorOrderIndex = p.Results.ColorOrderIndex;
+            end
+            hold on
+            obj.blDevPlot('Msurf','xrange',p.Results.xrange,'fmt',p.Results.fmt,'LineWidth',p.Results.LineWidth, 'FontSize', p.Results.FontSize);
+            ylabel('M_{surf}');
+            a.XTickLabel = [];
+            grid on
+
+            % Kinematic shape factor
+            nexttile(2)
+            a = gca;
+            if ~isempty(p.Results.ColorOrderIndex)
+                a.ColorOrderIndex = p.Results.ColorOrderIndex;
+            end
+            hold on
+            obj.blDevPlot('H_k','xrange',p.Results.xrange,'fmt',p.Results.fmt,'LineWidth',p.Results.LineWidth, 'FontSize', p.Results.FontSize);
+            ylabel('H_k')
+            a.XTickLabel = [];
+            grid on
+
+            % H-Pr loop
+            nexttile(3,[2 1])
+            hold on
+            a = gca;
+            if ~isempty(p.Results.ColorOrderIndex)
+                a = gca;
+                a.ColorOrderIndex = p.Results.ColorOrderIndex;
+            end
+            
+
+            s = obj.plot_Hk_Pr_locus('xrange',loopxrange,'fmt',p.Results.fmt,'LineWidth',p.Results.LineWidth, 'FontSize', p.Results.FontSize);
+            s.DisplayName = p.Results.label;
+
+            if isempty(a.Legend)
+                l = legend(s,'Interpreter','latex');
+                l.Layout.Tile = 'east';
+            end
+
+            if p.Results.ploteq
+                lims = axis;
+                eq = obj.plot_Hk_Pr_locus('LineWidth',p.Results.LineWidth,'ploteq',true);
+                eq.DisplayName = 'Equilibrium Line';
+                axis(lims);
+                a.ColorOrderIndex = max(a.ColorOrderIndex - 1,1);
+                if length(a.Legend.Children) > 2 && isempty(find(strcmp(a.Legend.String, "Equilibrium Line"),1))
+                    i = find(strcmp(a.Legend.String, "Equilibrium Line"));
+                    a.Legend.Children = [a.Legend.Children(1:i-1) a.Legend.Children(i+1:end) a.Legend.Children(i)];
+                end
+            end
+            
+            % Displacement thickness
+            nexttile(4)
+            a = gca;
+            if ~isempty(p.Results.ColorOrderIndex)
+                a.ColorOrderIndex = p.Results.ColorOrderIndex;
+            end
+                hold on
+            obj.blDevPlot('delStar','xrange',p.Results.xrange,'fmt',p.Results.fmt,'LineWidth',p.Results.LineWidth, 'FontSize', p.Results.FontSize);
+            ylabel('\delta^*/L');
+            a.XTickLabel = [];
+            grid on
+
+            % Integrated production
+            nexttile(5)
+            a = gca;
+            if ~isempty(p.Results.ColorOrderIndex)
+                a.ColorOrderIndex = p.Results.ColorOrderIndex;
+            end
+            hold on
+            obj.blDevPlot('blPr','xrange',p.Results.xrange,'fmt',p.Results.fmt,'LineWidth',p.Results.LineWidth, 'FontSize', p.Results.FontSize);
+            ylabel('Production')
+            a.XTickLabel = [];
+            grid on
+
+            % Momentum thickness
+            nexttile(7)
+            if ~isempty(p.Results.ColorOrderIndex)
+                a = gca;
+                a.ColorOrderIndex = p.Results.ColorOrderIndex;
+            end
+            hold on
+            obj.blDevPlot('theta','xrange',p.Results.xrange,'fmt',p.Results.fmt,'LineWidth',p.Results.LineWidth, 'FontSize', p.Results.FontSize);
+            ylabel('\theta/L');
+            xlabel('x/L');
+            grid on
+            
+            % Skin friction coeffient
+            nexttile(8)
+            a = gca;
+            if ~isempty(p.Results.ColorOrderIndex)
+                a.ColorOrderIndex = p.Results.ColorOrderIndex;
+            end
+            hold on
+            obj.blDevPlot('cf','xrange',p.Results.xrange,'fmt',p.Results.fmt,'LineWidth',p.Results.LineWidth, 'FontSize', p.Results.FontSize);
+            ylabel('c_f')
+            xlabel('x/L');
+            grid on
+            
+            
+
+            if ~isempty(p.Results.title)
+                title(t, p.Results.title, 'FontSize', p.Results.FontSize+2);
+            end
+
+            nexttile(3)
+            a = gca;
+            a.Legend
+            if isempty(a.Legend)
+                l = legend(s,'Interpreter','latex');
+                l.Layout.Tile = 'east';
+            end
+
+        end
+
         function plt = plot_y_profile(obj, x, prop, ax)
             if nargin < 4 || isempty(ax)
                 ax = gca;
@@ -565,6 +783,56 @@ classdef aveSlice < kCut
             [q, i] = BLprof(obj,x,prop);
             size(q);
             plot(ax, q, obj.yBL(i,:))
+        end
+
+        function s = plot_BL_profile(obj,x,prop, varargin)
+
+
+            defaultAx = gca;
+            defaultEdgeY = [];
+            defaultLineWidth = 1.5;
+            defaultFmtString = '';
+
+            p = inputParser;
+
+            addRequired(p, 'x', @isfloat);
+            addRequired(p, 'prop', @ischar);
+            addParameter(p, 'ax', defaultAx);
+            addParameter(p, 'yEdge', defaultEdgeY);
+            addParameter(p, 'normalise', false);
+            addParameter(p, 'scale', 1);
+            addParameter(p, 'fmt', defaultFmtString);
+            addParameter(p, 'LineWidth', defaultLineWidth);
+            addParameter(p, 'normaliseY', true);
+
+            parse(p, x, prop, varargin{:});  
+
+            [q, i] = BLprof(obj,x,prop);
+            BLinds = obj.BLedgeInd;
+            j = BLinds(i);
+            if ~isempty(p.Results.yEdge)
+                yEdge = p.Results.yEdge;
+            elseif p.Results.normaliseY
+                yEdge = obj.yBL(i,j);
+            else
+                yEdge = 1;
+            end
+
+            if p.Results.normalise
+                scale = max(abs(q));
+            else
+                scale = p.Results.scale;
+            end
+
+            s = plot(p.Results.ax, q/scale, obj.yBL(i,:)/yEdge, ...                       % corresponding y vals
+                p.Results.fmt, ...                                                                      % Set format string
+                'LineWidth', p.Results.LineWidth);
+
+            if ismember(string(prop),["dsdy","s"])
+                hold on
+                scatter(p.Results.ax, q(j)/scale, obj.yBL(i,j)/yEdge)
+            end
+
         end
 
         function [plt] = plot_H_Pr_locus(obj, varargin) % ax, ploteq, xrange, fmt, lineColour)
@@ -624,7 +892,7 @@ classdef aveSlice < kCut
             end
             xlabel('H_{incomp}')
             ylabel('Pr')
-            set(gca,'FontSize',12)
+            set(p.Results.ax,'FontSize',p.Results.FontSize)
             disp('')
             C = colororder;
             
@@ -642,6 +910,7 @@ classdef aveSlice < kCut
             defaultFmtString = '';
             defaultLineWidth = 1.5;
             defaultLineColor = '';
+            defaultFontSize = 12;
 
             p = inputParser;
 
@@ -652,6 +921,7 @@ classdef aveSlice < kCut
             addParameter(p, 'fmt', defaultFmtString);
             addParameter(p, 'LineWidth', defaultLineWidth);
             addParameter(p, 'LineColor', '');
+            addParameter(p, 'FontSize', defaultFontSize);
 
             parse(p, varargin{:})
 
@@ -687,9 +957,9 @@ classdef aveSlice < kCut
             else
                 plt = plot(p.Results.ax, H, pr, fmt, "LineWidth", p.Results.LineWidth);%varplotargs{:});
             end
-            xlabel('H_{incomp}')
+            xlabel('H_{k}')
             ylabel('Pr')
-            set(gca,'FontSize',12)
+            set(p.Results.ax,'FontSize',12)
             disp('')
             C = colororder;
             
@@ -717,7 +987,7 @@ classdef aveSlice < kCut
                 ys = obj.yBL(i,1:inds(i));
                 value(i) = trapz(ys, Prprof)/(roe*Ue^3);
             end
-            value = smooth(value,obj.nSmooth);
+            value = obj.smooth_dist(value);
         end
 
         function value = get.blPr_eq(obj)
@@ -856,6 +1126,7 @@ classdef aveSlice < kCut
         end
 
 
+        
         
         function blContour(obj, prop, ax, lims, fmt)
             if nargin < 3 || isempty(ax)
@@ -1002,6 +1273,30 @@ classdef aveSlice < kCut
 
             value = obj.yBL.*sqrt(abs(obj.tau_w).*ronow)./munow;
 
+        end
+
+        function value = get.mut(obj)
+            value = obj.get_mut;
+        end
+
+        function obj = set.mut(obj, value)
+            obj.set_mut(value);
+        end
+
+        function set_mut(obj,value)
+        end
+
+        function value = get_mut(obj)
+            disp('Overload get_mut in relevant subclass')
+            value = [];
+        end
+
+        function value = get.mut_ratio(obj)
+            mutnow = obj.mut;
+            munow = obj.mu;
+            for ib = 1:obj.NB
+                value{ib} = mutnow{ib}./munow{ib};
+            end
         end
 
         

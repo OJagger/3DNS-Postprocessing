@@ -733,6 +733,7 @@
             addParameter(p, 'nrepeats', defaultRepeats);
             addParameter(p, 'rot', defaultRot);
             addParameter(p, 'Interpreter', 'none');
+            addParameter(p, 'ColorMap', 'parula')
 
             parse(p, varargin{:});
 
@@ -791,6 +792,9 @@
             elseif ismember(string(prop),["vortZ","v","w", "advK"])
                 val = max(abs(caxis));
                 caxis([-val val]);
+                colormap(redblue)
+            elseif string(prop) == "M" && string(p.Results.ColorMap) == "redblue"
+                caxis([0 2])
                 colormap(redblue)
             end
                
@@ -868,7 +872,7 @@
                 cla(ax);
                 switch class(slices(i))
                     case 'kSlice'
-                        obj.kPlot(slices(i),prop,ax,lims,label)
+                        obj.kPlot(slices(i),prop,'ax',ax,'lims',lims,'label',label)
                     case 'jSlice'
                         obj.jPlot(slices(i),prop,ax,lims,label)
                 end
@@ -2459,7 +2463,7 @@
             replot = false;
 
             if nargin < 8
-                framerate = 5;
+                framerate = 10;
             end
             if nargin < 6 || isempty(area)
                 area = obj.blk.viewarea;

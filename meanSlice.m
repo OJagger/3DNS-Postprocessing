@@ -39,10 +39,10 @@ classdef meanSlice < aveSlice
         eta_Kol         % Kolmogorov scale
         cellSize_Kol;   % Cell size/ Kolmogorov scale
         mut_opt;
-        mut_ratio;
         tau_Re;
         tau_Re_an;      % Anisotropic componant of Re stress tensor
         tau_an_mag;     % Magnitude of anisotropic componant of Re stress
+        tau_Re_an_mag;
         omega_opt;
         Rij;
         tau_Re_mag;     % RijSij / sqrt(SijSij)
@@ -359,78 +359,118 @@ classdef meanSlice < aveSlice
         end
 
         function value = get.mut_opt(obj)
+            
+            %Traceless strain tensor
+            S = obj.St_an;
+            % Traceless Re stress tensor
+            tau = obj.tau_Re_an;
             for ib = 1:obj.NB
 
-                [DUDX,DUDY] = gradHO(obj.blk.x{ib},obj.blk.y{ib},obj.u{ib});
-                [DVDX,DVDY] = gradHO(obj.blk.x{ib},obj.blk.y{ib},obj.v{ib});
+%                 [DUDX,DUDY] = gradHO(obj.blk.x{ib},obj.blk.y{ib},obj.u{ib});
+%                 [DVDX,DVDY] = gradHO(obj.blk.x{ib},obj.blk.y{ib},obj.v{ib});
 
-                %Traceless strain tensor
-                S = zeros(obj.blk.blockdims(ib,1),obj.blk.blockdims(ib,2),3,3);
-                tau = S;
                 
-                S(:,:,1,1) = 2*DUDX/3 - DVDY/3;
-                S(:,:,2,2) = 2*DVDY/3 - DUDX/3;
-                S(:,:,3,3) = -(DUDX+DVDY)/3;
-
-                S(:,:,1,2) = 0.5*(DUDY+DVDX);
-                S(:,:,2,1) = S(:,:,1,2);
+%                 S = zeros(obj.blk.blockdims(ib,1),obj.blk.blockdims(ib,2),3,3);
+%                 tau = S;
+%                 
+%                 S(:,:,1,1) = 2*DUDX/3 - DVDY/3;
+%                 S(:,:,2,2) = 2*DVDY/3 - DUDX/3;
+%                 S(:,:,3,3) = -(DUDX+DVDY)/3;
+% 
+%                 S(:,:,1,2) = 0.5*(DUDY+DVDX);
+%                 S(:,:,2,1) = S(:,:,1,2);
 
                 % Traceless strain magnitude
-                St = sqrt(sum(sum(S.*S,4),3));
+%                 St = sqrt(sum(sum(S.*S,4),3));
                 
-                % Traceless Re stress tensor
-                tau(:,:,1,1) = 2*obj.roUddUdd{ib}/3 - obj.roVddVdd{ib}/3 - obj.roWddWdd{ib}/3;
-                tau(:,:,2,2) = 2*obj.roVddVdd{ib}/3 - obj.roUddWdd{ib}/3 - obj.roUddWdd{ib}/3;
-                tau(:,:,3,3) = 2*obj.roWddWdd{ib}/3 - obj.roUddUdd{ib}/3 - obj.roVddVdd{ib}/3;
+%                 tau(:,:,1,1) = -2*obj.roUddUdd{ib}/3 + obj.roVddVdd{ib}/3 + obj.roWddWdd{ib}/3;
+%                 tau(:,:,2,2) = -2*obj.roVddVdd{ib}/3 + obj.roUddWdd{ib}/3 + obj.roUddWdd{ib}/3;
+%                 tau(:,:,3,3) = -2*obj.roWddWdd{ib}/3 + obj.roUddUdd{ib}/3 + obj.roVddVdd{ib}/3;
+% 
+%                 tau(:,:,1,2) = -obj.roUddVdd{ib};
+%                 tau(:,:,2,1) = tau(:,:,1,2);
 
-                tau(:,:,1,2) = obj.roUddVdd{ib};
-                tau(:,:,2,1) = tau(:,:,1,2);
-
-                num = sum(sum(abs(tau.*S),4),3);
-                den = sqrt(sum(sum(S.*S,4),3));
+                num = sum(sum(tau{ib}.*S{ib},4),3);
+                den = sum(sum(S{ib}.*S{ib},4),3);
+                mask = obj.k{ib} < 10;
+                num(mask) = 0;
+                
+%                 den  = max(den, 1000);
 %                 num = obj.tau_Re{ib};
-                den = obj.S_an_mag{ib};
+%                 den = obj.S_an_mag{ib};
 
-                value{ib} = 0.5*abs(num./den.^2);
+                value{ib} = 0.5*abs(num./den);
 
             end
         end
 
-        function value = get.tau_Re_an(obj)
-            Snow = obj.St_an;
+        function value = mut_opt_ratio(obj)
+            mut = obj.mut_opt;
+            mu = obj.mu;
             for ib = 1:obj.NB
-
-
-                tau = zeros(obj.blk.blockdims(ib,1),obj.blk.blockdims(ib,2),3,3);
-                
-                tau(:,:,1,1) = 2*obj.roUddUdd{ib}/3 - obj.roVddVdd{ib}/3 - obj.roWddWdd{ib}/3;
-                tau(:,:,2,2) = 2*obj.roVddVdd{ib}/3 - obj.roUddUdd{ib}/3 - obj.roWddWdd{ib}/3;
-                tau(:,:,3,3) = 2*obj.roWddWdd{ib}/3 - obj.roUddUdd{ib}/3 - obj.roVddVdd{ib}/3;
-
-                tau(:,:,1,2) = obj.roUddVdd{ib};
-                tau(:,:,2,1) = tau(:,:,1,2);
-
-                value{ib} = sum(sum(abs(tau.*Snow{ib}),4),3);
+                value{ib} = mut{ib}./mu{ib};
             end
         end
 
         function value = get.tau_Re(obj)
-            Snow = obj.St_an;
-            for ib = 1:obj.NB
 
+            for ib = 1:obj.NB
 
                 tau = zeros(obj.blk.blockdims(ib,1),obj.blk.blockdims(ib,2),3,3);
                 
-                tau(:,:,1,1) = 2*obj.roUddUdd{ib}/3 - obj.roVddVdd{ib}/3 - obj.roWddWdd{ib}/3;
-                tau(:,:,2,2) = 2*obj.roVddVdd{ib}/3 - obj.roUddUdd{ib}/3 - obj.roWddWdd{ib}/3;
-                tau(:,:,3,3) = 2*obj.roWddWdd{ib}/3 - obj.roUddUdd{ib}/3 - obj.roVddVdd{ib}/3;
+                tau(:,:,1,1) = -obj.roUddUdd{ib};
+                tau(:,:,2,2) = -obj.roVddVdd{ib};
+                tau(:,:,3,3) = -obj.roWddWdd{ib};
 
-                tau(:,:,1,2) = obj.roUddVdd{ib};
+                tau(:,:,1,2) = -obj.roUddVdd{ib};
                 tau(:,:,2,1) = tau(:,:,1,2);
 
-                value{ib} = sum(sum(abs(tau.*Snow{ib}),4),3);
+                tau(:,:,1,3) = -obj.roUddWdd{ib};
+                tau(:,:,3,1) = tau(:,:,1,3);
+
+                value{ib} = tau;
             end
         end
+
+        function value = get.tau_Re_an(obj)
+
+            tau_Re = obj.tau_Re;
+
+            for ib = 1:obj.NB
+
+                tr = tau_Re{ib}(:,:,1,1) + tau_Re{ib}(:,:,2,2) + tau_Re{ib}(:,:,3,3);
+
+                tau = tau_Re{ib};
+                for i = 1:3
+                    tau(:,:,i,i) = tau(:,:,i,i) - tr/3;
+                end
+
+                value{ib} = tau;
+
+
+%                 tau = zeros(obj.blk.blockdims(ib,1),obj.blk.blockdims(ib,2),3,3);
+%                 
+%                 tau(:,:,1,1) = -2*obj.roUddUdd{ib}/3 + obj.roVddVdd{ib}/3 + obj.roWddWdd{ib}/3;
+%                 tau(:,:,2,2) = -2*obj.roVddVdd{ib}/3 + obj.roUddUdd{ib}/3 + obj.roWddWdd{ib}/3;
+%                 tau(:,:,3,3) = -2*obj.roWddWdd{ib}/3 + obj.roUddUdd{ib}/3 + obj.roVddVdd{ib}/3;
+% 
+%                 tau(:,:,1,2) = -obj.roUddVdd{ib};
+%                 tau(:,:,2,1) = tau(:,:,1,2);
+% 
+%                 value{ib} = sum(sum(abs(tau.*Snow{ib}),4),3);
+            end
+        end
+
+        function value = get.tau_Re_an_mag(obj)
+
+            tau = obj.tau_Re_an;
+            for ib = 1:obj.NB
+                value{ib} = sqrt(sum(sum(tau{ib}.*tau{ib},4),3));
+            end
+
+        end
+
+
 
         function value = get.Rij(obj)
             for ib = 1:obj.NB
@@ -512,19 +552,15 @@ classdef meanSlice < aveSlice
             end
         end
 
-        function value = get.mut_ratio(obj)
-            mto = obj.mut_opt;
-            munow = obj.mu;
-            for ib = 1:obj.NB
-                value{ib} = mto{ib}./munow{ib};
-            end
-        end
 
         function value = get.omega_opt(obj)
             mto = obj.mut_opt;
+            mul = obj.mu;
+            ronow = obj.ro;
             know = obj.k;
+
             for ib = 1:obj.NB
-                om = know{ib}./max(0.5,mto{ib});
+                om = ronow{ib}.*know{ib}./max(mul{ib},mto{ib});
                 value{ib} = abs(om);
                 
             end
@@ -544,6 +580,10 @@ classdef meanSlice < aveSlice
 
         function obj.set_T(obj,value)
             obj.Tbar = value;
+        end
+
+        function value = get_mut(obj)
+            value = obj.mut_opt;
         end
         
         

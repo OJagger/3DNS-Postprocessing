@@ -1,4 +1,4 @@
-    classdef kSlice < kCut
+classdef kSlice < kCut
     % KSLICE Contains a 2D slice of the flow at k-boundary
     %   Detailed explanation goes here
 
@@ -8,7 +8,7 @@
         casepath;
     end
 
-    properties (Dependent = true)
+    properties (Dependent = true, Hidden = true)
 %         T;
 %         p;
 %         M;

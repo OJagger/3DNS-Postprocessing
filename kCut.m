@@ -13,6 +13,7 @@ classdef kCut < flowSlice
         oblocks_flip;
         iLE;
         iTE;
+        c;
         n;
         ssurf;          % Surface distance fron LE
         vortZ;          % Z vorticity
@@ -89,6 +90,7 @@ classdef kCut < flowSlice
                     obj.iO = io(obj.iLE:obj.iTE,:);
                     obj.jO = jo(obj.iLE:obj.iTE,:);
                     obj.blkO = blko(obj.iLE:obj.iTE,:);
+                    obj.c = sqrt((obj.xO(end,end) - obj.xO(end,1))^2 + (obj.yO(end,end) - obj.yO(end,1))^2);
                     %obj.xSurf = xsurf([obj.iLE:-1:1 end:-1:obj.iTE]);
                     %size(obj.xSurf)
                     R = [0 -1; 1 0];
@@ -205,19 +207,21 @@ classdef kCut < flowSlice
 
         end
 
-        function plot_BL_profile(obj,x,prop,ax)
-            if nargin < 4 || isempty(ax)
-                ax = gca;
-                disp('Creating axes')
-            end
 
-            [q, i] = BLprof(obj,x,prop);
-            if string(prop) == "dsdy"
-                plot(ax, q, obj.yBL(i,2:end))
-            else
-                plot(ax, q, obj.yBL(i,:))%/obj.yBL(i,end))
-            end
-        end
+
+%         function plot_BL_profile(obj,x,prop,ax)
+%             if nargin < 4 || isempty(ax)
+%                 ax = gca;
+%                 disp('Creating axes')
+%             end
+% 
+%             [q, i] = BLprof(obj,x,prop);
+%             if string(prop) == "dsdy"
+%                 plot(ax, q, obj.yBL(i,2:end))
+%             else
+%                 plot(ax, q, obj.yBL(i,:))%/obj.yBL(i,end))
+%             end
+%         end
 
         function [i, j, blk] = grid_inds_at_BL_max(obj,prop,x)
             io = obj.x2ind(x);

@@ -1,8 +1,10 @@
 function slice2kPlot(slice, blk, prop, fpath, lims, label, area, aspect)
 
     repeats = 1;
+    pitch = 0;
     if isfield(blk, "n_pitchwise_repeats")
         repeats = blk.n_pitchwise_repeats;
+        pitch = blk.pitch;
     end
     h = figure('Visible','off');
     ax = axes(h);
@@ -16,7 +18,7 @@ function slice2kPlot(slice, blk, prop, fpath, lims, label, area, aspect)
     end
     for ir = 1:repeats
     for i=1:slice.NB
-        pcolor(ax, blk.x{i}, blk.y{i}+offset+(ir-1)*blk.pitch, q{i});
+        pcolor(ax, blk.x{i}, blk.y{i}+offset+(ir-1)*pitch, q{i});
     end
     end
     shading('interp')

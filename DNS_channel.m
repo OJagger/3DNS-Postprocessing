@@ -38,6 +38,8 @@ classdef DNS_channel < DNS_case
                 obj.blk.viewarea(2) = max(obj.blk.viewarea(2), max(obj.blk.x{ib},[],'all'));
                 obj.blk.viewarea(3) = min(obj.blk.viewarea(3), min(obj.blk.y{ib},[],'all'));
                 obj.blk.viewarea(4) = max(obj.blk.viewarea(4), max(obj.blk.y{ib},[],'all'));
+
+                obj.blk.walldist{ib} = obj.blk.y{1};
             end
             obj.blk.aspect = [(obj.blk.viewarea(2)-obj.blk.viewarea(1)) ...
                 (obj.blk.viewarea(4)-obj.blk.viewarea(3)) 1];
@@ -212,6 +214,143 @@ classdef DNS_channel < DNS_case
             fclose(f);
         end
 
+        function data = get_fluent_inlet_bc_data(obj, x)
+
+            if nargin < 2 || isempty(x)
+                is = 1;
+                x = 0;
+                xturb = 0.25;
+            else
+                is = obj.meanFlow.x2ind(x);
+                xturb = x;
+            end
+            
+            data.xsample = x;
+            del = obj.meanFlow.x2prop(x, 'delta99');
+            y = obj.blk.y{1}(is,:);
+            data.x = obj.blk.x{1}(is,:);
+            data.y = y;
+            data.y(end) = obj.blk.y{1}(1,end);
+            data.kprof = obj.meanFlow.BLprof(xturb,'k');
+            data.mut_opt = obj.meanFlow.BLprof(xturb,'mut_opt');
+            data.mut_ratio = obj.meanFlow.BLprof(xturb,'mut_opt_ratio');
+            data.omprof = obj.meanFlow.BLprof(xturb,'omega_opt');
+            data.uprof = obj.meanFlow.BLprof(x,'u');
+            data.vprof = obj.meanFlow.BLprof(x,'v');
+            Vin = sqrt(data.uprof.^2+data.vprof.^2);
+            data.Vin = Vin;%blend2freestream(y, Vin, del, obj.bcs.vin);
+            data.Tu = sqrt(2*data.kprof/3)./data.Vin;
+            [data.Toin, ~] = obj.meanFlow.BLprof(x,'T0');
+            data.Tin = data.Toin - data.Vin.^2/(2*obj.gas.cp);
+            Minf = M_VT0(obj.bcs.vin,obj.bcs.Toin,obj.gas.gam,obj.gas.cp);
+            Mprof = M_VT0(data.Vin,data.Toin,obj.gas.gam,obj.gas.cp);
+            data.Mprof = Mprof*Minf/Mprof(end);
+
+            data.uprof = blend2freestream(y, data.uprof, del, obj.bcs.vin);
+            data.vprof = blend2freestream(y, data.vprof, del, 0);
+%             data.omprof = blend2freestream(y, data.omprof, del, 100);
+
+            ps = obj.bcs.Poin*p_p0(Minf, obj.gas.gam);
+            data.pprof = ps*ones(size(data.x));
+            rgas = obj.gas.cp * (1- 1/obj.gas.gam);
+            data.roprof = data.pprof ./ (rgas * data.Tin);
+            data.Poin = ps./p_p0(data.Mprof,obj.gas.gam);
+%             uprof = obj.meanFlow.BLprof(0.25,'u');
+%             vprof = obj.meanFlow.BLprof(0.25,'v');
+            data.aprof = atand(data.vprof./data.uprof);
+%             [Poin, ~] = obj.inletProf(obj.meanFlow,'p0');
+%             [Mprof, ~] = obj.inletProf(obj.meanFlow,'M');
+            data.pprof = data.Poin.*p_p0(data.Mprof,obj.gas.gam);
+
+            function profnow = blend2freestream(y, prof, delta, freeval)
+
+                fac = 0.5*(1+tanh(y/delta - 2));
+                profnow = (1-fac).*prof + fac.*freeval;
+
+            end
+
+        end
+
+        function s =  write_fluent_inlet_bc(obj, x, iwrite)
+
+            if nargin < 2 || isempty(x)
+                is = 1;
+                x = 0;
+                xturb = 0.25;
+            elseif ~isfloat(x)
+                data  = x;
+            else
+                data = obj.get_fluent_inlet_bc_data(x);
+            end
+
+            if nargin < 3 || isempty(iwrite)
+                iwrite = true;
+            end
+
+            loc = '';
+            if data.xsample > 0
+                loc = strrep(sprintf('_%4.2f', data.xsample),'.','-');
+            end
+            s = ['fluent_inlet_bc_data' loc '.prof'];
+            s = fullfile(obj.casepath, s);
+    
+            if iwrite
+                f = fopen(s,'w');
+    
+                props2write = ["x" "y" "uprof" "vprof" "Vin" "Tin" "pprof" "Toin" "Poin" "roprof" "aprof" "kprof" "omprof" "mut_opt" "mut_ratio" "Tu" "Mprof"];
+                prop_names = ["x" "y" "u" "v" "vmag" "t" "p" "tstag" "pstag" "ro" "a" "k" "omega" "mut_opt" "mut_ratio" "tu" "mach"];
+    
+                fprintf(f, '((inlet-bl line %d)', length(data.x));
+                for np = 1:length(prop_names)
+                    prop = props2write(np);
+                    prof = data.(prop);
+                    prof(isnan(prof))=0;
+    
+                    fprintf(f, '\n(%s', prop_names(np));
+                    fprintf(f, "\n%f %f %f %f %f %f %f %f %f %f %f %f", prof);
+                    fprintf(f, "\n)");
+                end
+                fprintf(f, ')');
+                fclose(f);
+            end
+
+        end
+
+        function [s, ps] = write_fluent_freestream_bc(obj, iwrite)
+
+            if nargin < 2 || isempty(iwrite)
+                iwrite = true;
+            end
+
+            data.x = obj.blk.x{1}(:,end);
+            data.y = obj.blk.y{1}(:,end);
+            data.pprof = obj.meanFlow.p{1}(:,end);
+            ps = data.pprof(end);
+
+            s = fullfile(obj.casepath, 'fluent_freestream_bc_data.prof');
+
+            if iwrite
+                f = fopen(s,'w');
+
+                props2write = ["x" "y" "pprof"];
+                prop_names = ["x" "y" "p"];
+
+                fprintf(f, '((freestream line %d)', length(data.x));
+                for np = 1:length(prop_names)
+                    prop = props2write(np);
+                    prof = data.(prop);
+                    prof(isnan(prof))=0;
+    
+                    fprintf(f, '\n(%s', prop_names(np));
+                    fprintf(f, "\n%f %f %f %f %f %f %f %f %f %f %f %f", prof);
+                    fprintf(f, "\n)");
+                end
+                fprintf(f, ')');
+                fclose(f);
+            end
+
+        end
+
         function write_hydra_split_inlet_bc(obj)
             kprof = obj.meanFlow.BLprof(0.25,'k');
             omprof = obj.meanFlow.BLprof(0.25,'omega_opt');
@@ -319,7 +458,7 @@ classdef DNS_channel < DNS_case
             boundaries{end+1} = b;
         end
 
-        function [flow vin ps] = init_shock_flow(obj, Min, xShock, Lshock, theta_in)
+        function [flow vin ps muref] = init_shock_flow(obj, Min, xShock, Lshock, theta_in, Reth_in)
             gam = obj.gas.gam;
             cp = obj.gas.cp;
             rgas = cp*(gam-1)/gam;
@@ -350,6 +489,10 @@ classdef DNS_channel < DNS_case
             vs = Ms*sqrt(gam*rgas*Ts);
             Ets = ps/(gam-1) + 0.5*ros*vs^2;
 
+            % Reference viscosiy
+            muin = roin*vin*theta_in / Reth_in;
+            muref = sutherland_mu_ref(muin, tin);
+
             % BL profiles
             if theta_in > 0
                 [vel_prof, po_prof, To_prof, T_prof] = blasius_bl(obj.bcs.Toin, vin, theta_in, obj.blk.y{1}(1,:), obj.gas);
@@ -377,6 +520,33 @@ classdef DNS_channel < DNS_case
             flow.u{1} = 0.5*((vin + vs) - (vin-vs)*shfn).*blfn_vel;
             flow.ro{1} = 0.5*((roin + ros) - (roin-ros)*shfn).*blfn_ro;
             flow.Et{1} = 0.5*((Etin+Ets) - (Etin-Ets)*shfn).*blfn_et;
+
+
+            fprintf('Inlet pressure: %7.5e\n', pin);
+            fprintf('Inlet velocity: %6.2f\n', vin);            
+            fprintf('Inlet temperature: %6.2fr2\n', tin);
+            fprintf('Inlet density: %6.4f\n', roin);
+            
+            fprintf('\n')
+
+            fprintf('Outlet pressure: %7.5e\n', ps);
+            fprintf('Outlet velocity: %6.2f\n', vs);
+            fprintf('Outlet Mach number: %6.4f\n', Ms);
+            
+        end
+
+        function calc_muref(obj, Reth)
+            
+        end
+
+        function setup_freestream_pressure_dist(obj, x, u, p)
+
+            fid = fopen(fullfile(obj.casepath, 'freestream.txt'), 'w');
+            fprintf(fid,'%d\n', length(x))
+            for i = 1:length(x)
+                fprintf(fid, '%f %f %f\n', x(i), u(i), p(i));
+            end
+            fclose(fid);
         end
 
         function [in out] = get_BCs(obj, Min)
@@ -413,6 +583,7 @@ classdef DNS_channel < DNS_case
             out.p = ps;
 
         end
+
 
 
     end

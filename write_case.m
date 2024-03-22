@@ -1,8 +1,15 @@
-function write_case(casename,blk,next_block,next_patch,corner,bcs,gas,solver,topology,nkproc)
+function write_case(casename,blk,bcs,gas,solver,topology,nkproc, varargin)
+
+p = inputParser;
+addParameter(p, 'casetype', 'both');
+parse(p, varargin{:})
 nargin
-if nargin < 10 || ~exist('nkproc','var')
+if nargin < 7 || ~exist('nkproc','var')
     nkproc = ceil(solver.nk/solver.npp);
     fprintf('k procs: %d\n', nkproc)
+end
+if nargin < 6
+    topology = [];
 end
 
 if ~isfield(gas,'gamma')
@@ -10,7 +17,7 @@ if ~isfield(gas,'gamma')
 end
 
 NB = length(blk.x);
-ncorner = length(corner);   
+ncorner = length(blk.corner);   
 
 dir = fullfile(pwd,casename);
 
@@ -18,7 +25,7 @@ if(~exist(dir,'dir'))
 mkdir(dir);
 end
 
-write_input_files(casename,blk,next_block,next_patch,corner,bcs,gas,solver,topology,nkproc)
+write_input_files(casename,blk,bcs,gas,solver,'nkproc', nkproc, 'casetype', p.Results.casetype)
 
 % write grid
 for ii=1:NB

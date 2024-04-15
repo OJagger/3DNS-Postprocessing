@@ -48,7 +48,10 @@ classdef kCut < flowSlice
                         itmp = 1:ni;
                         itmp = repmat(itmp',[1 nj]);
                         jtmp = 1:nj;
-                        jtmp = repmat(flip(jtmp), [ni 1]);
+                        if blk.next_patch{nb}.jp == 3
+                            jtmp = flip(jtmp);
+                        end
+                        jtmp = repmat(jtmp, [ni 1]);
                         blktmp = nb*ones(ni,nj);
                         if blk.next_patch{nb}.jp == 3
                             xtmp = flip(xtmp,2);

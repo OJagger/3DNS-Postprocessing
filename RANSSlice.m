@@ -221,6 +221,11 @@ classdef RANSSlice < aveSlice
                 cb.Label.Interpreter = 'latex';
             end
             axis equal
+            if ~isempty(obj.blk.viewarea)
+                aspect = [(obj.blk.viewarea(2)-obj.blk.viewarea(1)) (obj.blk.viewarea(4)-obj.blk.viewarea(3)) 1];
+                pbaspect(aspect)
+                axis(obj.blk.viewarea);
+            end
 
         end
 
@@ -231,11 +236,12 @@ classdef RANSSlice < aveSlice
                 value = obj.Pr_store;
             elseif ~isempty(obj.mut_store)
                 disp('Calculating Pr: using stored mut')
+                deltaij(1,1,:,:) = [1 0 0; 0 1 0; 0 0 1];
+                St_an_now = obj.St_an;
+                vgrad = obj.duidxj;
                 for nb = 1:obj.NB
-                    value{nb} = obj.mut_store{nb}.*obj.StR{nb}.^2;
-    %                 [DUDX,DUDY] = gradHO(obj.blk.x{nb},obj.blk.y{nb},obj.u{nb});
-    %                 [DVDX,DVDY] = gradHO(obj.blk.x{nb},obj.blk.y{nb},obj.v{nb});
-                    %value{nb} = (obj.mut{nb}.*DUDX.^2 + obj.mut{nb}.*(DUDY.^2+DVDX.^2) + obj.mut{nb}.*DVDY.^2);
+                    tauij = 2*obj.mut_store{nb}.*St_an_now{nb} - (2/3)*(obj.ro{nb}.*obj.k{nb}).*deltaij;
+                    value{nb} = sum(sum(vgrad{nb}.*tauij, 4), 3);
                 end
             else
                 disp('Calculating Pr with k-om SST formulation')

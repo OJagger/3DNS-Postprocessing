@@ -62,6 +62,8 @@ classdef aveSlice < kCut
         yplus;
         mut;            % Turbulent viscosity
         mut_ratio;
+        RT;             % Hydra stupe turbulent Re
+%         wallDist;
     end
 
     methods
@@ -602,6 +604,37 @@ classdef aveSlice < kCut
 %             end
 %             set(plt,'LineWidth',1.5)
             disp('')
+        end
+
+        function plt = plot_BL_edge(obj, varargin)
+
+            x0 = min(obj.xSurf);
+            x1 = max(obj.xSurf);
+
+            defaultLineWidth = 1.5;
+            defaultFmtString = '';
+            defaultXRange = [x0 x1];
+
+            p = inputParser;
+
+            addParameter(p, 'ax', gca);
+            addParameter(p, 'xrange', defaultXRange);
+            addParameter(p, 'loopxrange', []);
+            addParameter(p, 'ploteq', false);
+            addParameter(p, 'fmt', defaultFmtString);
+            addParameter(p, 'LineWidth', defaultLineWidth);
+            addParameter(p, 'ColorOrderIndex',[]);
+            addParameter(p, 'thickness', 'delta99');
+
+            parse(p, varargin{:});
+
+            x = obj.xSurf;
+            edge = obj.(p.Results.thickness);
+            i1 = obj.x2ind(p.Results.xrange(1));
+            i2 = obj.x2ind(p.Results.xrange(2));
+
+            plt = plot(p.Results.ax, x(i1:i2), edge(i1:i2), p.Results.fmt, 'LineWidth',p.Results.LineWidth);
+            
         end
 
         function [f] = plot_BL_summary(obj, varargin)
@@ -1156,6 +1189,15 @@ classdef aveSlice < kCut
             ys = obj.yBL(io,:);
             ynow = ys(2) * y_plus / yplus_wall(io);
             [~, jo] = min(abs(ys - ynow));
+            i = obj.iO(io, jo);
+            j = obj.jO(io, jo);
+            blk = obj.blkO(io, jo);
+        end
+
+        function [i, j, blk] = grid_inds(obj,x,y)
+            io = obj.x2ind(x);
+            ys = obj.yBL(io,:);
+            [~, jo] = min(abs(ys - y));
             i = obj.iO(io, jo);
             j = obj.jO(io, jo);
             blk = obj.blkO(io, jo);

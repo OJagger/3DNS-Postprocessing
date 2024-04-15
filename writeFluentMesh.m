@@ -1,6 +1,6 @@
 function blkNodes = writeFluentMesh(path, blk, boundaries, iWrite)
 
-    if nargin < 5
+    if nargin < 4
         iWrite = true;
     end
 

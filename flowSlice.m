@@ -49,6 +49,7 @@ classdef flowSlice < handle
         wallDist;       % Distance from wall
         flowAng;
         muSij2;         % Dissipation due to mean strain
+        duidxj;         % Velocity gradient tensor
     end
 
     methods
@@ -345,6 +346,25 @@ classdef flowSlice < handle
 
         end
 
+        function value = get.duidxj(obj)
+            
+            for ib = 1:obj.NB
+
+                [DUDX,DUDY] = gradHO(obj.blk.x{ib},obj.blk.y{ib},obj.u{ib});
+                [DVDX,DVDY] = gradHO(obj.blk.x{ib},obj.blk.y{ib},obj.v{ib});
+                
+                S = zeros(obj.blk.blockdims(ib,1),obj.blk.blockdims(ib,2),3,3);
+                
+                S(:,:,1,1) = DUDX;
+                S(:,:,2,2) = DVDY;
+                S(:,:,1,2) = DUDY;
+                S(:,:,2,1) = DVDX;
+
+                value{ib} = S;
+            end
+
+        end
+
 
         function value = get.S_an_mag(obj)
             Snow = obj.St_an;
@@ -405,7 +425,17 @@ classdef flowSlice < handle
         end
 
         function value = get.wallDist(obj)
-            value = obj.blk.walldist;
+            if ~isempty(obj.blk.walldist)
+                value = obj.blk.walldist;
+            else
+                p = []
+                for ib = 1:obj.NB
+                end
+
+                obj.blk.walldist = value;
+            end
+
+
         end
 
         function kPlot(obj, prop)

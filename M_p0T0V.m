@@ -10,5 +10,5 @@ function M = M_p0T0V(p0,T0,v,gam,cp)
     rgas = cp*(gam-1)/gam;
 
     T = T0 - v.^2/(2*cp);
-    M = T./sqrt(gam*rgas*T);
+    M = v./sqrt(gam*rgas*T);
 end

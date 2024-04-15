@@ -745,10 +745,16 @@
             R = [cosd(p.Results.rot) -sind(p.Results.rot); sind(p.Results.rot) cosd(p.Results.rot)];
             ax = p.Results.ax;
 
-            if isempty(slice)
-                q = obj.(prop);
+            if ischar(prop) || isstring(prop)
+                storedq = true;
+                if isempty(slice)
+                    q = obj.(prop);
+                else
+                    q = slice.(prop);
+                end
             else
-                q = slice.(prop);
+                storedq = false;
+                q = prop;
             end
 
             hold on
@@ -757,7 +763,7 @@
                 offset = -obj.pitch;
             end
             for ir = 1:repeats
-            for i=1:slice.NB
+            for i=1:obj.NB
 
                 xnow = obj.blk.x{i};
                 ynow = obj.blk.y{i}+offset+(ir-1)*obj.pitch;
@@ -781,21 +787,23 @@
                 axis(p.Results.viewarea);
             end
 
-            if string(prop) == "schlieren"
-                colormap(gray)
-                map = colormap;
-                map = flip(map,1);
-                colormap(map);
-                if isempty(label)
-                    label = '$|\nabla \rho|/\rho$';
+            if storedq
+                if string(prop) == "schlieren"
+                    colormap(gray)
+                    map = colormap;
+                    map = flip(map,1);
+                    colormap(map);
+                    if isempty(label)
+                        label = '$|\nabla \rho|/\rho$';
+                    end
+                elseif ismember(string(prop),["vortZ","v","w", "advK"])
+                    val = max(abs(caxis));
+                    caxis([-val val]);
+                    colormap(redblue)
+                elseif string(prop) == "M" && string(p.Results.ColorMap) == "redblue"
+                    caxis([0 2])
+                    colormap(redblue)
                 end
-            elseif ismember(string(prop),["vortZ","v","w", "advK"])
-                val = max(abs(caxis));
-                caxis([-val val]);
-                colormap(redblue)
-            elseif string(prop) == "M" && string(p.Results.ColorMap) == "redblue"
-                caxis([0 2])
-                colormap(redblue)
             end
                
             cb = colorbar;

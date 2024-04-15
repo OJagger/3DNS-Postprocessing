@@ -35,14 +35,16 @@ classdef meanSlice < aveSlice
         roVddWdd;
     end
 
-    properties (Dependent = true)
-        eta_Kol         % Kolmogorov scale
-        cellSize_Kol;   % Cell size/ Kolmogorov scale
+    properties (Dependent = true, Hidden = true)
+        eta_Kol             % Kolmogorov scale
+        cellSize_Kol;       % Cell size/ Kolmogorov scale
         mut_opt;
+        mut_opt_cleaned;
         tau_Re;
-        tau_Re_an;      % Anisotropic componant of Re stress tensor
-        tau_an_mag;     % Magnitude of anisotropic componant of Re stress
-        tau_Re_an_mag;
+        tau_Re_an;          % Anisotropic componant of Re stress tensor
+        tau_an_mag;         % Magnitude of anisotropic componant of Re stress
+        tau_Re_an_mag;      
+        tau_Re_Boussinesq;  % Reynolds stress tensor calculated with 
         omega_opt;
         Rij;
         tau_Re_mag;     % RijSij / sqrt(SijSij)
@@ -470,8 +472,6 @@ classdef meanSlice < aveSlice
 
         end
 
-
-
         function value = get.Rij(obj)
             for ib = 1:obj.NB
 
@@ -586,6 +586,59 @@ classdef meanSlice < aveSlice
             value = obj.mut_opt;
         end
         
+        function value = get.mut_opt_cleaned(obj)
+
+            mtr = obj.mut_ratio{1}; 
+            ynow = obj.blk.y{1};
+            del = obj.delta99;
+
+            for i=1:obj.blk.blockdims(1,1)
+                
+                mtr_max = max(mtr(i,ynow(i,:) < 0.9*del(i)));
+                lim = mtr_max * (1-tanh(((ynow(i,:)/del(i) - 0.9)*10)));
+                mtr(i,:) = min(mtr(i,:),lim);
+            end
+
+            value{1} = mtr.*obj.mu{1};
+
+        end
+
+        
+        function write_as_inst_slice(obj, path)
+
+            for ib = 1:obj.NB
+
+                f = fopen(fullfile(path, ['flow_' num2str(ib)]),'w');
+
+                A(:,1) = reshape(obj.ro{ib},[],1);
+                A(:,2) = reshape(obj.u{ib},[],1).*A(:,1);
+                A(:,3) = reshape(obj.v{ib},[],1).*A(:,1);
+                A(:,4) = reshape(obj.w{ib},[],1).*A(:,1);
+                A(:,5) = reshape(obj.Et{ib},[],1);
+
+                A = reshape(A',[],1);
+                fwrite(f,A,'float64');
+                fclose(f);
+
+            end
+
+        end
+
+        function probes = xyPlusToProbeInds(obj, x, yp, k)
+
+            if nargin < 4
+                k=1;
+            end
+
+            probes = {};
+
+            for i = 1:length(yp)
+                [probe.i, probe.j, probe.nb] = grid_inds_at_y_plus(obj,x,yp(i));
+                probe.k = k;
+                probes{end+1} = probe;
+            end
+
+        end
         
     end
 

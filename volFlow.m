@@ -32,7 +32,7 @@ classdef volFlow < handle
         if_rans;
     end
 
-    properties (Dependent = true)
+    properties (Dependent = true, Hidden = true)
         T;              % Temperature
         p;              % p stat
         M;              % Mach No

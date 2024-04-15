@@ -174,47 +174,7 @@ classdef DNS_channel < DNS_case
             newCase = DNS_channel;
         end
 
-        function write_hydra_inlet_bc(obj)
-            kprof = obj.meanFlow.BLprof(0.25,'k');
-            omprof = obj.meanFlow.BLprof(0.25,'omega_opt');
-            [uprof, y] = obj.inletProf(obj.meanFlow,'u');
-            [vprof, ~] = obj.inletProf(obj.meanFlow,'v');
-            Vin = sqrt(uprof.^2+vprof.^2);
-            [Toin, ~] = obj.inletProf(obj.meanFlow,'T0');
-            Tin = Toin - Vin.^2/(2*obj.gas.cp);
-            Minf = M_VT0(obj.bcs.vin,obj.bcs.Toin,obj.gas.gam,obj.gas.cp);
-            Mprof = M_VT0(Vin,Toin,obj.gas.gam,obj.gas.cp);
-            Mprof = Mprof*Minf/Mprof(end);
-            ps = obj.bcs.Poin*p_p0(Minf, obj.gas.gam);
-            Poin = ps./p_p0(Mprof,obj.gas.gam);
-%             uprof = obj.meanFlow.BLprof(0.25,'u');
-%             vprof = obj.meanFlow.BLprof(0.25,'v');
-            aprof = atand(vprof./uprof);
-%             [Poin, ~] = obj.inletProf(obj.meanFlow,'p0');
-%             [Mprof, ~] = obj.inletProf(obj.meanFlow,'M');
-            pprof = Poin.*p_p0(Mprof,obj.gas.gam);
-            
-
-%             [vel_prof, po_prof, To_prof, T_prof] = blasius_bl(obj.bcs.Toin, obj.bcs.vin, obj.bcs.theta, obj.blk.y{1}(1,:), obj.gas);
-%             Toin = To_prof*obj.bcs.Toin;
-%             Tin = obj.bcs.Toin - obj.bcs.vin^2/(2*obj.gas.cp);
-%             Poin = po_prof*obj.bcs.Poin;
-%             rgas = obj.gas.cp*(obj.gas.gam-1)/obj.gas.gam;
-%             Mprof = obj.bcs.vin*vel_prof./sqrt(obj.gas.gam*rgas*Tin*T_prof);
-
-            f = fopen(fullfile(obj.casepath, 'hydra_inlet_bc_data.txt'),'w');
-            for j=1:length(kprof)
-%                 data = fprintf(f,'\t%8.6f\t%8.6f\t%8.6f\t%8.6f\t%8.6f\t%8.6f\t%8.6f\n',...
-%                     [y(j) Toin(j) Poin(j) Mprof(j) aprof(j) kprof(j) omprof(j)]);
-%                 data = fprintf(f,'\t%8.6f\t%8.6f\t%8.6f\t%8.6f\t%8.6f\t%8.6f\t%8.6f\n',...
-%                     [y(j) Poin(j) Toin(j) Mprof(j) aprof(j) 0.0 1000.0]);
-                data = fprintf(f,'\t%8.6f\t%8.6f\t%8.6f\t%8.6f\t%8.6f\t%8.6f\n',...
-                    [y(j) Toin(j) Poin(j) aprof(j) kprof(j) omprof(j)]);
-            end
-            fclose(f);
-        end
-
-        function data = get_fluent_inlet_bc_data(obj, x)
+        function data = get_inlet_bc_data(obj, x)
 
             if nargin < 2 || isempty(x)
                 is = 1;
@@ -271,7 +231,104 @@ classdef DNS_channel < DNS_case
 
         end
 
-        function s =  write_fluent_inlet_bc(obj, x, iwrite)
+        function s = write_hydra_inlet_bc(obj, x, iwrite)
+
+            if nargin < 2 || isempty(x)
+                is = 1;
+                x = 0;
+            end
+            if ~isfloat(x)
+                data  = x;
+            else
+                data = obj.get_inlet_bc_data(x);
+            end
+
+            if nargin < 3 || isempty(iwrite)
+                iwrite = true;
+            end
+
+            loc = '';
+            if data.xsample > 0
+                loc = strrep(sprintf('_%4.2f', data.xsample),'.','-');
+            end
+            s = ['hydra_inlet_bc_data' loc '.xml'];
+            s = fullfile(obj.casepath, s);
+
+%             kprof = obj.meanFlow.BLprof(0.25,'k');
+%             omprof = obj.meanFlow.BLprof(0.25,'omega_opt');
+%             [uprof, y] = obj.inletProf(obj.meanFlow,'u');
+%             [vprof, ~] = obj.inletProf(obj.meanFlow,'v');
+%             Vin = sqrt(uprof.^2+vprof.^2);
+%             [Toin, ~] = obj.inletProf(obj.meanFlow,'T0');
+%             Tin = Toin - Vin.^2/(2*obj.gas.cp);
+%             Minf = M_VT0(obj.bcs.vin,obj.bcs.Toin,obj.gas.gam,obj.gas.cp);
+%             Mprof = M_VT0(Vin,Toin,obj.gas.gam,obj.gas.cp);
+%             Mprof = Mprof*Minf/Mprof(end);
+%             ps = obj.bcs.Poin*p_p0(Minf, obj.gas.gam);
+%             Poin = ps./p_p0(Mprof,obj.gas.gam);
+% %             uprof = obj.meanFlow.BLprof(0.25,'u');
+% %             vprof = obj.meanFlow.BLprof(0.25,'v');
+%             aprof = atand(vprof./uprof);
+% %             [Poin, ~] = obj.inletProf(obj.meanFlow,'p0');
+% %             [Mprof, ~] = obj.inletProf(obj.meanFlow,'M');
+%             pprof = Poin.*p_p0(Mprof,obj.gas.gam);
+            
+
+%             [vel_prof, po_prof, To_prof, T_prof] = blasius_bl(obj.bcs.Toin, obj.bcs.vin, obj.bcs.theta, obj.blk.y{1}(1,:), obj.gas);
+%             Toin = To_prof*obj.bcs.Toin;
+%             Tin = obj.bcs.Toin - obj.bcs.vin^2/(2*obj.gas.cp);
+%             Poin = po_prof*obj.bcs.Poin;
+%             rgas = obj.gas.cp*(obj.gas.gam-1)/obj.gas.gam;
+%             Mprof = obj.bcs.vin*vel_prof./sqrt(obj.gas.gam*rgas*Tin*T_prof);
+
+            props2write = ["y" "Poin" "Toin" "aprof" "Mprof" "kprof" "omprof"];
+            prop_names = ["y" "ptotal" "ttotal" "apitch" "mach" "turbke" "turbomga"];
+
+            for np=1:length(props2write)
+                prop = props2write(np);
+                prof = data.(prop);
+                prof(isnan(prof))=0;
+                A(:,np) = prof;
+            end
+
+            if iwrite
+                f = fopen(s,'w');
+    
+                fprintf(f, '<?xml version="1.0" encoding="UTF-8"?>\n');
+                fprintf(f, '<hydra>\n');
+                fprintf(f, '\t<bc>\n');
+                fprintf(f, '\t\t<table rank="1" ncols="%d" units="si" form="unstructured" interp="spline">\n',size(A,2)-1);
+                fprintf(f, '\t\t\t<npoints>%d</npoints>\n', size(A,1));
+                fprintf(f, '\t\t\t<names>\n');
+                header = repmat('%s ',1,size(A,2));
+                header = ['\t\t\t\t' header(1:end-1) '\n'];
+                fprintf(f, header, prop_names);
+                fprintf(f, '\t\t\t</names>\n');
+    
+                fprintf(f, '\t\t\t<data>\n');
+                fmt = repmat('%8.6f ',1,size(A,2));
+                fmt = ['\t\t\t\t' fmt(1:end-1) '\n'];
+                fprintf(f, fmt, reshape(A',1,[]));
+                fprintf(f, '\t\t\t</data>\n');
+    
+                fprintf(f, '\t\t</table>\n');
+                fprintf(f, '\t</bc>\n');
+
+                fprintf(f, '</hydra>\n');
+    
+    %             for j=1:length(kprof)
+    % %                 data = fprintf(f,'\t%8.6f\t%8.6f\t%8.6f\t%8.6f\t%8.6f\t%8.6f\t%8.6f\n',...
+    % %                     [y(j) Toin(j) Poin(j) Mprof(j) aprof(j) kprof(j) omprof(j)]);
+    % %                 data = fprintf(f,'\t%8.6f\t%8.6f\t%8.6f\t%8.6f\t%8.6f\t%8.6f\t%8.6f\n',...
+    % %                     [y(j) Poin(j) Toin(j) Mprof(j) aprof(j) 0.0 1000.0]);
+    %                 data = fprintf(f,'\t%8.6f\t%8.6f\t%8.6f\t%8.6f\t%8.6f\t%8.6f\n',...
+    %                     [y(j) Toin(j) Poin(j) aprof(j) kprof(j) omprof(j)]);
+    %             end
+                fclose(f);
+            end
+        end
+
+        function s = write_fluent_inlet_bc(obj, x, iwrite)
 
             if nargin < 2 || isempty(x)
                 is = 1;
@@ -280,7 +337,7 @@ classdef DNS_channel < DNS_case
             elseif ~isfloat(x)
                 data  = x;
             else
-                data = obj.get_fluent_inlet_bc_data(x);
+                data = obj.get_inlet_bc_data(x);
             end
 
             if nargin < 3 || isempty(iwrite)
@@ -346,6 +403,60 @@ classdef DNS_channel < DNS_case
                     fprintf(f, "\n)");
                 end
                 fprintf(f, ')');
+                fclose(f);
+            end
+
+        end
+
+        function [s, ps] = write_hydra_freestream_bc(obj, iwrite)
+
+            if nargin < 2 || isempty(iwrite)
+                iwrite = true;
+            end
+
+            data.x = obj.blk.x{1}(:,end);
+            data.y = obj.blk.y{1}(:,end);
+            data.pprof = obj.meanFlow.p{1}(:,end);
+            ps = data.pprof(end);
+
+            s = 'hydra_freestream_bc_data.xml';
+            s = fullfile(obj.casepath, s);
+
+            props2write = ["x" "pprof"];
+            prop_names = ["x" "pstatic"];
+
+            for np=1:length(props2write)
+                prop = props2write(np);
+                prof = data.(prop);
+                prof(isnan(prof))=0;
+                A(:,np) = prof;
+            end
+    
+            if iwrite
+                f = fopen(s,'w');
+    
+                fprintf(f, '<?xml version="1.0" encoding="UTF-8"?>\n');
+                fprintf(f, '<hydra>\n');
+                fprintf(f, '\t<bc>\n');
+                fprintf(f, '\t\t<table rank="1" ncols="%d" units="si" form="unstructured" interp="spline">\n',size(A,2)-1);
+                fprintf(f, '\t\t\t<npoints>%d</npoints>\n', size(A,1));
+                fprintf(f, '\t\t\t<names>\n');
+                header = repmat('%s ',1,size(A,2));
+                header = ['\t\t\t\t' header(1:end-1) '\n'];
+                fprintf(f, header, prop_names);
+                fprintf(f, '\t\t\t</names>\n');
+    
+                fprintf(f, '\t\t\t<data>\n');
+                fmt = repmat('%8.6f ',1,size(A,2));
+                fmt = ['\t\t\t\t' fmt(1:end-1) '\n'];
+                fprintf(f, fmt, reshape(A',1,[]));
+                fprintf(f, '\t\t\t</data>\n');
+    
+                fprintf(f, '\t\t</table>\n');
+                fprintf(f, '\t</bc>\n');
+
+                fprintf(f, '</hydra>\n');
+    
                 fclose(f);
             end
 
@@ -423,28 +534,34 @@ classdef DNS_channel < DNS_case
             b.patches(1:obj.nbi) = 3;
             b.type = 3;
             boundaries{end+1} = b;
-            
-            b.label = "Pre-shock";
-            xmid = obj.blk.x{obj.nbi}(end,1)/2;
-            blks = [];
-            psblks = [];
-            for ib=(obj.NB-obj.nbi)+1:obj.NB
-                if obj.blk.x{ib}(floor(obj.blk.blockdims(ib,1)/2),end) < xmid
-                    blks = [blks ib];
-                else
-                    psblks = [psblks ib];
-                end
-            end
-            b.blocks = blks;
+
+            b.Label = "Freestream";
+            blks = (obj.NB-obj.nbi)+1:obj.NB;
             b.patches(1:length(blks)) = 4;
             b.type = 5;
             boundaries{end+1} = b;
-
-            b.label = "Post-shock";
-            b.blocks = psblks;
-            b.patches(1:length(psblks)) = 4;
-            b.type = 5;
-            boundaries{end+1} = b;
+            
+%             b.label = "Pre-shock";
+%             xmid = obj.blk.x{obj.nbi}(end,1)/2;
+%             blks = [];
+%             psblks = [];
+%             for ib=(obj.NB-obj.nbi)+1:obj.NB
+%                 if obj.blk.x{ib}(floor(obj.blk.blockdims(ib,1)/2),end) < xmid
+%                     blks = [blks ib];
+%                 else
+%                     psblks = [psblks ib];
+%                 end
+%             end
+%             b.blocks = blks;
+%             b.patches(1:length(blks)) = 4;
+%             b.type = 5;
+%             boundaries{end+1} = b;
+% 
+%             b.label = "Post-shock";
+%             b.blocks = psblks;
+%             b.patches(1:length(psblks)) = 4;
+%             b.type = 5;
+%             boundaries{end+1} = b;
             
             b.label = "Outlet";
             blks = [];
@@ -539,6 +656,53 @@ classdef DNS_channel < DNS_case
             
         end
 
+        function flow = transform_flow_m1(obj, M1new)
+
+            gam = obj.gas.gam;
+            cp = obj.gas.cp;
+            rgas = cp*(1-1/gam);
+            rostag = obj.bcs.Poin/(rgas*obj.bcs.Toin);
+
+            M1old = M_VT0(obj.bcs.vin, obj.bcs.Toin, obj.gas.gam, obj.gas.cp);
+            fM = 1+0.5*(gam-1)*M1old^2;
+            Mso = sqrt(fM/(gam*M1old^2 - 0.5*(gam-1)));
+            pino = obj.bcs.Poin*fM^(-gam/(gam-1));
+            pso = pino*(1+2*gam*(M1old^2-1)/(gam+1));
+
+            fM = 1+0.5*(gam-1)*M1new^2;
+            Msn = sqrt(fM/(gam*M1new^2 - 0.5*(gam-1)));
+            pinn = obj.bcs.Poin*fM^(-gam/(gam-1));
+            psn = pinn*(1+2*gam*(M1new^2-1)/(gam+1));
+
+            flow = volFlow;
+            flow.NB = obj.NB;
+            flow.gam = obj.gas.gam;
+            flow.cp = obj.gas.cp;
+            flow.blk = obj.blk;
+            flow.gas = obj.gas;
+            flow.nk = obj.solver.nk;
+            flow.flowpath = obj.casepath;
+            flow.casetype = 'gpu';
+
+
+            for ib = 1:obj.NB
+                
+%                 Mnew = Msn + (obj.instFlow.M{ib} - Mso)*(M1new - Msn)/(M1old - Mso);
+                Mnew = interp1([0 Mso M1old], [0 Msn M1new], obj.instFlow.M{1}, 'linear','extrap');
+                Pnew = psn + (obj.instFlow.p{ib} - pso)*(pinn - psn)/(pino - pso);
+                Vnew = Vel_M(Mnew, obj.bcs.Toin, cp, gam);
+                Vold = max(1e-6, obj.instFlow.vel{ib});
+                Tnew = obj.bcs.Toin*T_T0(Mnew, gam);
+                flow.ro{ib} = Pnew ./ (rgas * Tnew);
+                flow.u{ib} = Vnew.*obj.instFlow.u{ib}./Vold;
+                flow.v{ib} = Vnew.*obj.instFlow.v{ib}./Vold;
+                flow.w{ib} = Vnew.*obj.instFlow.w{ib}./Vold;
+                flow.Et{ib} = Pnew/(gam - 1) + 0.5*flow.ro{ib}.*Vnew.^2;
+
+            end
+
+        end
+
         function setup_freestream_pressure_dist(obj, x, u, p)
 
             fid = fopen(fullfile(obj.casepath, 'freestream.txt'), 'w');
@@ -584,7 +748,20 @@ classdef DNS_channel < DNS_case
 
         end
 
+        function write_mut_opt_file(obj)
+           
+            mto = obj.meanFlow.mut_opt_cleaned;
 
+            for ib = 1:obj.NB
+            
+                f = fopen(fullfile(obj.casepath, ['mut_opt_rans_' num2str(ib)]), 'wb');
+                A = reshape(mto{ib},1,[]);
+                fwrite(f,A,'float64');
+                fclose(f);
+    
+            end
+
+        end
 
     end
 end

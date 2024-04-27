@@ -1,4 +1,4 @@
-function ps = ps_M(M, p0, gam)
+function ps = ps_Mp0(M, p0, gam)
     
     if nargin < 3
         gam = 1.4;

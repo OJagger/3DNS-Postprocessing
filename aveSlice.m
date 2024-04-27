@@ -688,109 +688,135 @@ classdef aveSlice < kCut
                 loopxrange = p.Results.loopxrange;
             end
     
-
-            % Surface isentropic Mach number
-            nexttile(1)
-            a = gca;
-            if ~isempty(p.Results.ColorOrderIndex)
-                a.ColorOrderIndex = p.Results.ColorOrderIndex;
-            end
-            hold on
-            obj.blDevPlot('Msurf','xrange',p.Results.xrange,'fmt',p.Results.fmt,'LineWidth',p.Results.LineWidth, 'FontSize', p.Results.FontSize);
-            ylabel('M_{surf}');
-            a.XTickLabel = [];
-            grid on
-
-            % Kinematic shape factor
-            nexttile(2)
-            a = gca;
-            if ~isempty(p.Results.ColorOrderIndex)
-                a.ColorOrderIndex = p.Results.ColorOrderIndex;
-            end
-            hold on
-            obj.blDevPlot('H_k','xrange',p.Results.xrange,'fmt',p.Results.fmt,'LineWidth',p.Results.LineWidth, 'FontSize', p.Results.FontSize);
-            ylabel('H_k')
-            a.XTickLabel = [];
-            grid on
-
-            % H-Pr loop
-            nexttile(3,[2 1])
-            hold on
-            a = gca;
-            if ~isempty(p.Results.ColorOrderIndex)
+            try
+                % Surface isentropic Mach number
+                nexttile(1)
                 a = gca;
-                a.ColorOrderIndex = p.Results.ColorOrderIndex;
-            end
-            
-
-            s = obj.plot_Hk_Pr_locus('xrange',loopxrange,'fmt',p.Results.fmt,'LineWidth',p.Results.LineWidth, 'FontSize', p.Results.FontSize);
-            s.DisplayName = p.Results.label;
-
-            if isempty(a.Legend)
-                l = legend(s,'Interpreter','latex');
-                l.Layout.Tile = 'east';
-            end
-
-            if p.Results.ploteq
-                lims = axis;
-                eq = obj.plot_Hk_Pr_locus('LineWidth',p.Results.LineWidth,'ploteq',true);
-                eq.DisplayName = 'Equilibrium Line';
-                axis(lims);
-                a.ColorOrderIndex = max(a.ColorOrderIndex - 1,1);
-                if length(a.Legend.Children) > 2 && isempty(find(strcmp(a.Legend.String, "Equilibrium Line"),1))
-                    i = find(strcmp(a.Legend.String, "Equilibrium Line"));
-                    a.Legend.Children = [a.Legend.Children(1:i-1) a.Legend.Children(i+1:end) a.Legend.Children(i)];
+                if ~isempty(p.Results.ColorOrderIndex)
+                    a.ColorOrderIndex = p.Results.ColorOrderIndex;
                 end
-            end
-            
-            % Displacement thickness
-            nexttile(4)
-            a = gca;
-            if ~isempty(p.Results.ColorOrderIndex)
-                a.ColorOrderIndex = p.Results.ColorOrderIndex;
-            end
                 hold on
-            obj.blDevPlot('delStar','xrange',p.Results.xrange,'fmt',p.Results.fmt,'LineWidth',p.Results.LineWidth, 'FontSize', p.Results.FontSize);
-            ylabel('\delta^*/L');
-            a.XTickLabel = [];
-            grid on
-
-            % Integrated production
-            nexttile(5)
-            a = gca;
-            if ~isempty(p.Results.ColorOrderIndex)
-                a.ColorOrderIndex = p.Results.ColorOrderIndex;
+                obj.blDevPlot('Msurf','xrange',p.Results.xrange,'fmt',p.Results.fmt,'LineWidth',p.Results.LineWidth, 'FontSize', p.Results.FontSize);
+                ylabel('M_{surf}');
+                a.XTickLabel = [];
+                grid on
+            catch
+                disp('Could not plot Msurf')
             end
-            hold on
-            obj.blDevPlot('blPr','xrange',p.Results.xrange,'fmt',p.Results.fmt,'LineWidth',p.Results.LineWidth, 'FontSize', p.Results.FontSize);
-            ylabel('Production')
-            a.XTickLabel = [];
-            grid on
-
-            % Momentum thickness
-            nexttile(7)
-            if ~isempty(p.Results.ColorOrderIndex)
+    
+                try
+                % Kinematic shape factor
+                nexttile(2)
                 a = gca;
-                a.ColorOrderIndex = p.Results.ColorOrderIndex;
+                if ~isempty(p.Results.ColorOrderIndex)
+                    a.ColorOrderIndex = p.Results.ColorOrderIndex;
+                end
+                hold on
+                obj.blDevPlot('H_k','xrange',p.Results.xrange,'fmt',p.Results.fmt,'LineWidth',p.Results.LineWidth, 'FontSize', p.Results.FontSize);
+                ylabel('H_k')
+                a.XTickLabel = [];
+                grid on
+            catch
+                disp('Could not plot Hk')
             end
-            hold on
-            obj.blDevPlot('theta','xrange',p.Results.xrange,'fmt',p.Results.fmt,'LineWidth',p.Results.LineWidth, 'FontSize', p.Results.FontSize);
-            ylabel('\theta/L');
-            xlabel('x/L');
-            grid on
-            
-            % Skin friction coeffient
-            nexttile(8)
-            a = gca;
-            if ~isempty(p.Results.ColorOrderIndex)
-                a.ColorOrderIndex = p.Results.ColorOrderIndex;
+
+            try
+                % H-Pr loop
+                nexttile(3,[2 1])
+                hold on
+                a = gca;
+                if ~isempty(p.Results.ColorOrderIndex)
+                    a = gca;
+                    a.ColorOrderIndex = p.Results.ColorOrderIndex;
+                end
+                
+    
+                s = obj.plot_Hk_Pr_locus('xrange',loopxrange,'fmt',p.Results.fmt,'LineWidth',p.Results.LineWidth, 'FontSize', p.Results.FontSize);
+                s.DisplayName = p.Results.label;
+    
+                if isempty(a.Legend)
+                    l = legend(s,'Interpreter','latex');
+                    l.Layout.Tile = 'east';
+                end
+    
+                if p.Results.ploteq
+                    lims = axis;
+                    eq = obj.plot_Hk_Pr_locus('LineWidth',p.Results.LineWidth,'ploteq',true);
+                    eq.DisplayName = 'Equilibrium Line';
+                    axis(lims);
+                    a.ColorOrderIndex = max(a.ColorOrderIndex - 1,1);
+                    if length(a.Legend.Children) > 2 && isempty(find(strcmp(a.Legend.String, "Equilibrium Line"),1))
+                        i = find(strcmp(a.Legend.String, "Equilibrium Line"));
+                        a.Legend.Children = [a.Legend.Children(1:i-1) a.Legend.Children(i+1:end) a.Legend.Children(i)];
+                    end
+                end
+            catch
+                disp('Could not plot H-Pr loop')
             end
-            hold on
-            obj.blDevPlot('cf','xrange',p.Results.xrange,'fmt',p.Results.fmt,'LineWidth',p.Results.LineWidth, 'FontSize', p.Results.FontSize);
-            ylabel('c_f')
-            xlabel('x/L');
-            grid on
-            
+
+            try
+                % Displacement thickness
+                nexttile(4)
+                a = gca;
+                if ~isempty(p.Results.ColorOrderIndex)
+                    a.ColorOrderIndex = p.Results.ColorOrderIndex;
+                end
+                    hold on
+                obj.blDevPlot('delStar','xrange',p.Results.xrange,'fmt',p.Results.fmt,'LineWidth',p.Results.LineWidth, 'FontSize', p.Results.FontSize);
+                ylabel('\delta^*/L');
+                a.XTickLabel = [];
+                grid on
+            catch
+                disp('Could not plot delStar')
+            end
+
+            try
+                % Integrated production
+                nexttile(5)
+                a = gca;
+                if ~isempty(p.Results.ColorOrderIndex)
+                    a.ColorOrderIndex = p.Results.ColorOrderIndex;
+                end
+                hold on
+                obj.blDevPlot('blPr','xrange',p.Results.xrange,'fmt',p.Results.fmt,'LineWidth',p.Results.LineWidth, 'FontSize', p.Results.FontSize);
+                ylabel('Production')
+                a.XTickLabel = [];
+                grid on
+            catch
+                disp('Could not plot Pr')
+            end
+
+            try
+                % Momentum thickness
+                nexttile(7)
+                if ~isempty(p.Results.ColorOrderIndex)
+                    a = gca;
+                    a.ColorOrderIndex = p.Results.ColorOrderIndex;
+                end
+                hold on
+                obj.blDevPlot('theta','xrange',p.Results.xrange,'fmt',p.Results.fmt,'LineWidth',p.Results.LineWidth, 'FontSize', p.Results.FontSize);
+                ylabel('\theta/L');
+                xlabel('x/L');
+                grid on
+            catch
+                disp('Could not plot theta')
+            end
+
+            try
+                % Skin friction coeffient
+                nexttile(8)
+                a = gca;
+                if ~isempty(p.Results.ColorOrderIndex)
+                    a.ColorOrderIndex = p.Results.ColorOrderIndex;
+                end
+                hold on
+                obj.blDevPlot('cf','xrange',p.Results.xrange,'fmt',p.Results.fmt,'LineWidth',p.Results.LineWidth, 'FontSize', p.Results.FontSize);
+                ylabel('c_f')
+                xlabel('x/L');
+                grid on
+            catch
+                disp('Could not plot cf')
+            end
             
 
             if ~isempty(p.Results.title)
@@ -1333,12 +1359,16 @@ classdef aveSlice < kCut
             value = [];
         end
 
-        function value = get.mut_ratio(obj)
+        function value = get_mut_ratio(obj)
             mutnow = obj.mut;
             munow = obj.mu;
             for ib = 1:obj.NB
                 value{ib} = mutnow{ib}./munow{ib};
             end
+        end
+
+        function value = get.mut_ratio(obj)
+            value = obj.get_mut_ratio;
         end
 
         

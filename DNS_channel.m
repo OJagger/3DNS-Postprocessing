@@ -157,7 +157,6 @@ classdef DNS_channel < DNS_case
             end
         end
 
-
         function arr = concat_prop(obj, prop)
             arr = [];
             for j = 1:obj.nbj
@@ -575,6 +574,77 @@ classdef DNS_channel < DNS_case
             boundaries{end+1} = b;
         end
 
+        function write_3DNS_inlet_bc(obj, x, path, blk, iwrite)
+
+            if nargin < 2 || isempty(x)
+                data = obj.get_inlet_bc_data;
+            elseif ~isfloat(x)
+                data  = x;
+            else
+                data = obj.get_inlet_bc_data(x);
+            end
+
+            if nargin < 3 || isempty(path)
+                path = obj.casepath;
+            end
+
+            if nargin < 4 || isempty(blk)
+                blk = obj.blk;
+            end
+
+            if nargin < 5 || isempty(iwrite)
+                iwrite = true;
+            end
+
+            To = interp1(data.y, data.Toin/data.Toin(end), blk.y{1}(1,:));
+            Po = interp1(data.y, data.Poin/data.Poin(end), blk.y{1}(1,:));
+            vel = interp1(data.y, data.Vin/data.Vin(end), blk.y{1}(1,:));
+            a = interp1(data.y, pi*data.aprof/180, blk.y{1}(1,:));
+
+            if iwrite
+                f = fopen(fullfile(path, 'inlet_profile.txt'), 'w');
+                fprintf(f, '%4.2f\n', 0.0);
+
+                fprintf(f, '%6.6f %8.6f %8.6f %8.6f\n', [vel; Po; To; a]);
+
+                fclose(f);
+            end
+
+        end
+        
+        function write_3DNS_freestream_bc(obj, Min, xShock, Lshock, path)
+
+            if nargin < 5
+                path = obj.casepath;
+            end
+
+            gam = obj.gas.gam;
+            cp = obj.gas.cp;
+            rgas = cp*(gam-1)/gam;
+
+            % Pre-shock conditions
+            fM = 1+0.5*(gam-1)*Min^2;
+            pin = obj.bcs.Poin*fM^(-gam/(gam-1));
+            tin = obj.bcs.Toin/fM;
+            roin = pin/(rgas*tin);
+            vin = Min*sqrt(gam*rgas*tin);
+
+            % Post shock conditions
+            Ms = sqrt(fM/(gam*Min^2 - 0.5*(gam-1)));
+            ps = pin*(1+2*gam*(Min^2-1)/(gam+1));
+            ros = 0.5*roin*(gam+1)*Min^2/fM;
+            Ts = ps/(ros*rgas);
+            vs = Ms*sqrt(gam*rgas*Ts);
+
+            f = fopen(fullfile(path, 'freestream.txt'), 'w');
+            fprintf(f, '%d\n', 4);
+            fprintf(f, '%6.4f %8.6f %8.6f\n', [0.0 vin pin])
+            fprintf(f, '%6.4f %8.6f %8.6f\n', [xShock-Lshock/2 vin pin]);
+            fprintf(f, '%6.4f %8.6f %8.6f\n', [xShock+Lshock/2 vs ps]);
+            fprintf(f, '%6.4f %8.6f %8.6f\n', [1.0 vs ps]);
+
+        end
+
         function [flow vin ps muref] = init_shock_flow(obj, Min, xShock, Lshock, theta_in, Reth_in)
             gam = obj.gas.gam;
             cp = obj.gas.cp;
@@ -748,14 +818,24 @@ classdef DNS_channel < DNS_case
 
         end
 
-        function write_mut_opt_file(obj)
+        function write_mut_opt_file(obj, smoothwindow)
+
+            if nargin < 2
+                smoothwindow = 1;
+            end                
            
-            mto = obj.meanFlow.mut_opt_cleaned;
+            mto = obj.meanFlow.mut_opt_cleaned(smoothwindow);
+            mu = obj.meanFlow.mu;
 
             for ib = 1:obj.NB
             
                 f = fopen(fullfile(obj.casepath, ['mut_opt_rans_' num2str(ib)]), 'wb');
-                A = reshape(mto{ib},1,[]);
+                A = reshape(mto{ib}./mu{ib},1,[]);
+                fwrite(f,A,'float64');
+                fclose(f);
+
+                f = fopen(fullfile(obj.casepath, ['mut_opt2_rans_' num2str(ib)]), 'wb');
+                A = zeros(1,prod(obj.blk.blockdims(ib,:)))  ;
                 fwrite(f,A,'float64');
                 fclose(f);
     

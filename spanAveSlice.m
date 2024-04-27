@@ -28,10 +28,10 @@ classdef spanAveSlice < aveSlice
 
                     switch casetype
                         case 'cpu'
-
+                            
                         case 'gpu'
                             nstats = 6;
-                            flowpath = fullfile(casedir, ['flow2_' num2str(nb) '_' num2str(obj.nMean)])
+                            flowpath = fullfile(casedir, ['flow2_' num2str(nb) '_' num2str(obj.nMean)]);
                             f = dir(flowpath);
                             flofile = fopen(flowpath);
                             nstats = f.bytes/(ni*nj*8);

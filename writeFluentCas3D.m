@@ -1,14 +1,16 @@
-function blkNodes = writeFluentCas3D(path, blk, boundaries, iWrite)
+function writeFluentCas3D(path, blk, boundaries)
 
-    if nargin < 4
-        iWrite = true;
-    end
+    % Write 3DNS style prismatic mesh, extruded 1 cell in the span, and
+    % convert to .cas
+    % path: path to write cas file (ending with .cas)
+    % blk: struct containing mesh information
+    % boundaries: struct defining boundary patches
 
     nk = 2;
-    span = 1.0; % (blk.x{1}(end,1)-blk.x{1}(1,1))*(nk-1)/(size(blk.x{1},1)-1);
+    span = 1.0; 
 
     meshPath = strrep(path,'.cas','.msh');
-    writeFluentMeshExtruded(meshPath, blk, boundaries, span, nk, iWrite);
+    writeFluentMeshExtruded(meshPath, blk, boundaries, span, nk);
     
     jouPath = fullfile(fileparts(path),'mesh2cas.jou');
 

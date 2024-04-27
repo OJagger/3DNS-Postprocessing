@@ -1,5 +1,56 @@
 function blkNodes = writeFluentMeshExtruded(path, blk, boundaries, span, nk, iWrite)
 
+    % Write 3DNS style prismatic mesh as Fluent .msh file in ASCII format
+    % path: path to write file (ending in .msh)
+    % blk: struct containing mesh. Must contain fields:
+    %
+    %   x: Cell array of x coord arrays (size (ni, nj)), one per block
+    %   y: Cell array of y coord arrays (size (ni, nj)), one per block
+    %
+    %   next_block: Cell array of structs containing fields with keys im, 
+    %       ip, jm, jp. The field values define the block connectivity. 
+    %       Eg. next_block{3}.ip = 5 means the i=ni face of block 3 
+    %       boarders block 5. Set to zero on boundaries.
+    %
+    %   next_patch: Cell array of structs containing fields with keys im, 
+    %       ip, jm, jp. The values define which face of the neighboring
+    %       block is connected:
+    %       1: im (i=1) face
+    %       2: ip (i=ni) face
+    %       3: jm (j=1) face
+    %       4: jp (j=nj) face
+    %       Eg. next_patch{3}.ip = 3 means that the i=ni face of block 3
+    %       boarders the j=1 face of block 5 (following previous example)
+    %       On boundaries, the values define the boundary types in 3DNS:
+    %       1 for inlets
+    %       2 for outlets
+    %       3 for walls
+    %       however these boundary values are not needed here
+    %
+    %   boundries: Cell array of structs defining the boundaries. Each has
+    %       fields:
+    %       label: string label for boundary - written into file (for
+    %       debugging only)
+    %       blocks: list of blocks contained in boundary
+    %       patches: list defining which face of each block makes up
+    %       boundary. 1 for im, 2 for ip etc.
+    %       type. Boundary type (Fluent spec):
+    %       3: Wall
+    %       4: Pressure inlet
+    %       5: Pressure outlet
+    %       8: Periodic shadow
+    %       10: Velocity inlet
+    %       12: Periodic
+    %       see romeo.univ-reims.fr/documents/fluent/tgrid/ug/appb.pdf
+    %       for complete list
+    %
+    % span: spanwise extent (extrusion distance)
+    % nk: numper of grid points in span (No desired cells + 1)
+    % iWrite: set to false to disable file writeout for debugging
+    
+    
+
+
     next_block = blk.next_block;
     next_patch = blk.next_patch;
 
@@ -72,7 +123,7 @@ function blkNodes = writeFluentMeshExtruded(path, blk, boundaries, span, nk, iWr
     
     end
 
-    % Set cell nos
+    % Set cell Nos
 
     for ib = 1:NB
         for k=1:nk-1
@@ -85,7 +136,7 @@ function blkNodes = writeFluentMeshExtruded(path, blk, boundaries, span, nk, iWr
         end
     end
 
-    % Set face nos
+    % Set face Nos
     
     im_assigned(1:NB) = false;
     ip_assigned(1:NB) = false;
@@ -254,7 +305,7 @@ function blkNodes = writeFluentMeshExtruded(path, blk, boundaries, span, nk, iWr
             end
         end
 
-        % Set interior face nos
+        % Set interior face Nos
 
         % i faces
         for k=1:nk-1
@@ -505,9 +556,9 @@ function blkNodes = writeFluentMeshExtruded(path, blk, boundaries, span, nk, iWr
         end
     end
 
-    fprintf('nnodes: %d, should be %d\n', length(nodes), ni*nj*nk)
-    fprintf('ncells: %d, should be %d\n', ncells-1, ((ni-1)*(nj-1)*(nk-1)))
-    fprintf('nfaces: %d, should be %d\n', length(faces), ((ni-1)*nj*(nk-1) + ni*(nj-1)*(nk-1) + (ni-1)*(nj-1)*nk))
+%     fprintf('nnodes: %d, should be %d\n', length(nodes), ni*nj*nk)
+%     fprintf('ncells: %d, should be %d\n', ncells-1, ((ni-1)*(nj-1)*(nk-1)))
+%     fprintf('nfaces: %d, should be %d\n', length(faces), ((ni-1)*nj*(nk-1) + ni*(nj-1)*(nk-1) + (ni-1)*(nj-1)*nk))
 
     facesStr = cell(length(faces),1);
     nodesStr = cell(length(nodes),1);
@@ -534,8 +585,8 @@ function blkNodes = writeFluentMeshExtruded(path, blk, boundaries, span, nk, iWr
 
     if iWrite
         
-        path
-        fid = fopen(path,'w')
+        path;
+        fid = fopen(path,'w');
     
         fprintf(fid,'(0 "Grid:")\n');
         fprintf(fid,'\n');
@@ -741,7 +792,7 @@ function blkNodes = writeFluentMeshExtruded(path, blk, boundaries, span, nk, iWr
         end
     end
 
-function periodic = is_periodic(ib, dr)
+    function periodic = is_periodic(ib, dr)
         nblk = next_block{ib}.(dr);
         nptch = next_patch{ib}.(dr);
         if nblk ~= 0

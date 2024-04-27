@@ -1,4 +1,4 @@
-function write_input_files(casename,blk,bcs,gas,solver,varargin)
+function write_input_files(path,blk,bcs,gas,solver,varargin)
 nargin;
 p = inputParser;
 addParameter(p,'topology',[]);
@@ -33,20 +33,20 @@ fprintf('Using npp = %d\n', npp)
 NB = length(blk.x);
 ncorner = length(blk.corner);   
 
-dir = fullfile(pwd,casename);
-fprintf('Writing input files to directory: %s\n',dir)
+% dir = fullfile(pwd,casename);
+fprintf('Writing input files to directory: %s\n',path)
 
-if(~exist(dir,'dir'))
-mkdir(dir);
+if(~exist(path,'dir'))
+mkdir(path);
 end
 if strcmp(casetype,'gpu')
-    fid = fopen(fullfile(dir,'body.txt'),'a');
+    fid = fopen(fullfile(path,'body.txt'),'a');
     fclose(fid);
 end
 if ismember(casetype, {'gpu', 'all'})
     % Now write header for new input file
     % GPU input
-    fidin = fopen(fullfile(dir,'input_gpu.txt'),'w');
+    fidin = fopen(fullfile(path,'input_gpu.txt'),'w');
     fprintf(fidin,'%d %d\n', [NB,1]);
        
     nprocs = 0;
@@ -168,7 +168,7 @@ end
 if ismember(casetype, {'cpu','both'})
     % Now write header for new input file
     % CPU input
-    fidin = fopen(fullfile(dir,'input_cpu.txt'),'w');
+    fidin = fopen(fullfile(path,'input_cpu.txt'),'w');
     fprintf(fidin,'%d\n', [NB]);
        
     nprocs = 0;

@@ -1,4 +1,4 @@
-    classdef DNS_case < handle
+classdef DNS_case < handle
     %  DNS_CASE Class containing 3DNS case information and methods to read
     %  and postprocess results
 
@@ -25,6 +25,7 @@
         inlet_width;
         nj_inlet;
         meanFlow = meanSlice.empty;
+        ransFlow = RANSSlice.empty;
         meanFlows = {};
         instFlow = volFlow.empty;
         startFlow = spanAveSlice.empty;
@@ -267,6 +268,10 @@
 
         function readSpanAveFlo(obj)
             obj.spanAveFlow = kSlice(obj.blk,obj.gas,obj.bcs,obj.runpath,'flow_2d',[],obj.casetype,true);
+        end
+
+        function readRansFlow(obj)
+            obj.ransFlow = RANSSlice(obj.blk, obj.gas, obj.bcs, '3dns', obj.runpath);
         end
 
         function readKSlices(obj, slicenums, runs)
@@ -519,7 +524,7 @@
                 ishere = false;
             end
             try
-                obj.meanFlow = meanSlice(obj.runpath,obj.blk,obj.gas,obj.bcs,obj.casetype,ishere);
+                obj.meanFlow = meanSlice(obj.blk,obj.gas,obj.bcs,obj.runpath,obj.casetype,ishere);
             catch
                 try
                     data = load(fullfile(obj.runpath, 'slicesAve.mat'), 'slicesAve');
@@ -533,7 +538,7 @@
         end
 
         function inst2mean(obj,slice)
-            obj.meanFlow = meanSlice([],obj.blk,obj.gas,obj.bcs);
+            obj.meanFlow = meanSlice(obj.blk,obj.gas,obj.bcs,[]);
             obj.meanFlow.ro = slice.ro;
             obj.meanFlow.u = slice.u;
             obj.meanFlow.v = slice.v;
@@ -553,7 +558,7 @@
             regions = obj.getIntRegions;
             for ir = 1:length(obj.run)
                 fprintf('Reading meanSlice %d/%d (run %d)\n', [ir length(obj.run) obj.run(ir)])
-                mF = meanSlice(obj.runpaths{ir},obj.blk,obj.gas,obj.bcs,obj.casetype,false);
+                mF = meanSlice(obj.blk,obj.gas,obj.bcs,obj.runpaths{ir},obj.casetype,false);
                 if ir == 1
                     obj.meanFlow = mF;
                     if calc_s_unst
@@ -1856,12 +1861,12 @@
         end
 
         function writeInputFiles(obj)
-            write_input_files(obj.casename,obj.blk, ...
+            write_input_files(obj.casepath,obj.blk, ...
                 obj.bcs,obj.gas,obj.solver,'topology',obj.topology,'casetype',obj.casetype);
         end
 
         function writeGridFiles(obj)
-            write_grid(obj.casename, obj.blk)
+            write_grid(obj.casepath, obj.blk)
         end
 
         function get_cell_areas(obj)
@@ -2845,8 +2850,15 @@
             write_plot3d_2d(obj.blk, path);
         end
 
+        function writeFluentCas3D(obj, path)
+            if nargin < 2
+                path = fullfile(obj.casepath, [obj.casename '.cas']);
+            end
+            writeFluentCas3D(path, obj.blk, obj.getBoundaries);
+        end
+
         function mean = inst2ave(obj, sliceNums)
-            mean = meanSlice([], obj.blk, obj.gas, obj.bcs);
+            mean = meanSlice(obj.blk, obj.gas, obj.bcs, []);
 
             for ib=1:obj.NB
                 ni = obj.blk.blockdims(ib,1);

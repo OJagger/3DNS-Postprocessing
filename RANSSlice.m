@@ -4,8 +4,11 @@ classdef RANSSlice < aveSlice
         
     properties
         %blk;
+        turb_model;
+        solver;
         StR_store;            % Strain rate
         mut_store;            % Eddy viscosity
+        mut_ratio_store;      % Eddy viscosity ratio
         Pr_store;
 %         StR;
 %         mut;
@@ -25,172 +28,67 @@ classdef RANSSlice < aveSlice
     end
 
     methods
-        function obj = RANSSlice(blk, gas, bcs, basedir, datafile, trans, mod, nodes, renorm)
+        function obj = RANSSlice(blk, gas, bcs, solver, path)
             obj@aveSlice(blk, gas, bcs);
             disp('Constructing RANSSlice')
 
 
             if nargin > 3
 
-                            %obj.blk = blk;
-                obj.trans = trans;
-                obj.mod = mod;
-                transstr = ["turb","trans"];
-                modstr = ["bsl","mod"];
-                %data = readtable(fullfile(basedir,transstr(trans+1) + "_" + modstr(mod+1),'hf2d.txt'));
-                %data = readtable(fullfile(basedir,'hf2d.txt'));
-                data = readtable(fullfile(basedir,datafile));
-                if any("x_coordinate" == string(data.Properties.VariableNames))
-                    mode = 'fluent';
-                else
-                    mode = 'hydra';
+                obj.solver = solver;
+                switch solver
+                    case '3dns'
+
+                        % Get latest mean_count
+                        [~, folder] = fileparts(path);
+                        if strcmp(string(folder(1:3)), "run")
+                            fid = fopen(fullfile(path, 'mean_flo', 'mean_time.txt'),'r');
+                        else
+                            fid = fopen(fullfile(path, 'mean_time.txt'),'r');
+                        end
+                        while ~feof(fid) % Use lastest mean files
+                            temp=fgetl(fid);
+                        end
+                        fclose(fid);
+                        temp = str2num(temp);
+                        mean_count = temp(1);
+
+                        for ib = 1:obj.NB
+
+                            ni = blk.blockdims(ib,1);
+                            nj = blk.blockdims(ib,2);
+                            nk = blk.blockdims(ib,3);
+                            
+                            flowpath = fullfile(path, sprintf('flow2_%d_%d', [ib mean_count]));
+                            f = dir(flowpath);
+                            flofile = fopen(flowpath);
+                            ransfile = fopen(fullfile(path, sprintf('rans_%d', ib)));
+                            
+                            nstats = f.bytes/(ni*nj*8);
+                            A = fread(flofile,ni*nj*nstats,'float64');
+                            A = reshape(A,nstats,[])';
+                            fclose(flofile);
+
+                            obj.ro{ib} = reshape(A(:,1),ni,nj);
+                            obj.u{ib} = reshape(A(:,2),ni,nj)./obj.ro{ib};
+                            obj.v{ib} = reshape(A(:,3),ni,nj)./obj.ro{ib};
+                            obj.w{ib} = reshape(A(:,4),ni,nj)./obj.ro{ib};
+                            obj.Et{ib} = reshape(A(:,5),ni,nj);
+
+                            A = fread(ransfile,ni*nj*nk,'float64');
+                            A = reshape(A,ni,nj,nk);
+                            fclose(ransfile);
+                            
+                            obj.mut_ratio_store{ib} = mean(A,3);
+                            
+
+                        end
                 end
-    
-                if nargin < 7 || isempty(nodes)
-                    switch mode
-                        case 'fluent'
-                            points.x_coordinate = data.x_coordinate;
-                            points.y_coordinate = data.y_coordinate;
-                            points.nodenumber = data.nodenumber;
-                        case 'hydra'
-                            points.x_coordinate = data.Points_0;
-                            points.y_coordinate = data.Points_1;
-                            points.nodenumber = 1:Psize(data,1);
-                    end
-                    nodes = mesh2nodes(blk,points);
-                end
 
-                if nargin < 8 || renorm == false
-                    tref = 1;
-                    uref = 1;
-                    pref = 1;
-                    roref = 1;
-                    muref = 1;
-                else
-                    tref = 288;
-                    pref = 1.013e5;
-                    roref = 1.226;
-                    uref = sqrt(pref/roref);
-                end
-                    
-                
-                cv = gas.cp/gas.gam;
-                
-
-
-                mut = cell(1,obj.NB);
-                StR = cell(1,obj.NB);
-                obj.wallDist = cell(1,obj.NB);
-                for nb=1:obj.NB
-                    fprintf('nb: %d\n', nb)
-                    nib = blk.blockdims(nb,1);
-                    njb = blk.blockdims(nb,2);
-                    ro = zeros(nib,njb);
-                    u = zeros(nib,njb);
-                    v = zeros(nib,njb);
-                    w = zeros(nib,njb);
-                    Et = zeros(nib,njb);
-                    k = zeros(nib,njb);
-                    omega = zeros(nib,njb);
-                    mutnow = zeros(nib,njb);
-                    StRnow = zeros(nib,njb);
-                    wallDistNow = zeros(nib,njb);
-                    if obj.trans == 1
-                        gamma = zeros(nib,njb);
-                        Reth = zeros(nib,njb);
-                    end
-
-                    
-                    nodesnow = nodes{nb};
-                    switch mode
-                        case 'fluent'
-                            for i=1:nib
-                                for j=1:njb
-                                    node = nodesnow(i,j);
-                                    rotmp = data.density(node);
-                                    utmp = data.x_velocity(node);
-                                    vtmp = data.y_velocity(node);
-                                    Ttmp = data.temperature(node);
-                                    ro(i,j) = rotmp;
-                                    u(i,j) = utmp;
-                                    v(i,j) = vtmp;
-                                    Et(i,j) = rotmp*(cv*Ttmp + 0.5*(utmp^2+vtmp^2));
-                                    k(i,j) = data.turb_kinetic_energy(node);
-                                    omega(i,j) = data.specific_diss_rate(node);
-                                    mutnow(i,j) = data.viscosity_turb(node);
-                                    StRnow(i,j) = data.strain_rate_mag(node);
-                                    if obj.trans == 1
-                                        gamma(i,j) = data.intermittency(node);
-                                        Reth(i,j) = data.momentum_thickness_re(node);
-                                    end
-                                end
-                                mut{nb} = mutnow;
-                                StR{nb} = StRnow;
-                            end
-
-                        case 'hydra'
-                            mut=[];
-                            StR = [];
-                            for i=1:nib
-                                for j=1:njb
-                                    node = nodesnow(i,j);
-                                    rotmp = data.density(node);
-                                    utmp = data.relativeVelocityVector_0(node);
-                                    vtmp = data.relativeVelocityVector_1(node);
-                                    ptmp = data.staticPressure(node);
-                                    ro(i,j) = rotmp*roref;
-                                    u(i,j) = utmp*uref;
-                                    v(i,j) = vtmp*uref;
-                                    Ttmp = tref*ptmp/rotmp;
-                                    Et(i,j) = roref*rotmp*(cv*Ttmp + 0.5*uref^2*(utmp^2+vtmp^2));
-                                    k(i,j) = data.turbulentKineticEnergy(node);
-                                    omega(i,j) = data.turbulentOmega(node);
-                                    wallDistNow(i,j) = data.wallDistance(node);
-%                                     mut(i,j) = data.viscosity_turb(node);
-%                                     StR(i,j) = data.strain_rate_mag(node);
-                                    if obj.trans == 1
-                                        gamma(i,j) = data.intermittency(node);
-                                        Reth(i,j) = data.momentum_thickness_re(node);
-                                    end
-                                end
-                            end
-                    end
-                    obj.ro{nb} = ro;
-                    obj.u{nb} = u;
-                    obj.v{nb} = v;
-                    obj.w{nb} = w;
-                    obj.Et{nb} = Et;
-                    obj.k{nb} = k;
-                    obj.omega{nb} = omega;
-                    obj.wallDist{nb} = wallDistNow;
-                    if obj.trans == 1
-                        obj.gamma{nb} = gamma;
-                        obj.Reth{nb} = Reth;
-                    end
-                end
-                obj.mut_store = mut;
-                obj.StR_store = StR;
-                %clear nodes
-                obj.getBCs(blk.inlet_blocks{1});
             end
         end
 
-%         function value = get.p(obj)
-%             disp('Calculating p')
-%             value = cell(1,obj.NB);
-%             for nb = 1:obj.NB
-%                 value{nb} = (obj.gas.gam -1)*(obj.Et{nb} - 0.5*(obj.u{nb}.^2 + obj.v{nb}.^2 + obj.w{nb}.^2).*obj.ro{nb});
-%             end
-%         end
 
-%         function value = get.T(obj)
-%             disp('Calculating T')
-%             value = cell(1,obj.NB);
-%             for nb = 1:obj.NB
-%                 pnow = (obj.gas.gam -1)*(obj.Et{nb} - 0.5*(obj.u{nb}.^2 + obj.v{nb}.^2 + obj.w{nb}.^2).*obj.ro{nb});
-%                 value{nb} = pnow./(obj.ro{nb}*obj.gas.rgas);
-%             end
-%         end
 
         function contours = kPlot(obj,prop,ax,lims,label)
             disp('here')
@@ -243,6 +141,16 @@ classdef RANSSlice < aveSlice
                     tauij = 2*obj.mut_store{nb}.*St_an_now{nb} - (2/3)*(obj.ro{nb}.*obj.k{nb}).*deltaij;
                     value{nb} = sum(sum(vgrad{nb}.*tauij, 4), 3);
                 end
+            elseif ~isempty(obj.mut_ratio_store)
+                disp('Calculating Pr: using stored mut ratio')
+                deltaij(1,1,:,:) = [1 0 0; 0 1 0; 0 0 1];
+                St_an_now = obj.St_an;
+                vgrad = obj.duidxj;
+                munow = obj.mu;
+                for nb = 1:obj.NB
+                    tauij = 2*munow{nb}.*obj.mut_ratio_store{nb}.*St_an_now{nb} - (2/3)*(obj.ro{nb}.*obj.k{nb}).*deltaij;
+                    value{nb} = sum(sum(vgrad{nb}.*tauij, 4), 3);
+                end
             else
                 disp('Calculating Pr with k-om SST formulation')
                 value = obj.mut_koSST;
@@ -284,7 +192,36 @@ classdef RANSSlice < aveSlice
         end
 
         function value = get_mut(obj)
-            value = obj.mut_store;
+            if ~isempty(obj.mut_store)
+                value = obj.mut_store;
+            elseif ~isempty(obj.mut_ratio_store)
+                munow = obj.mu;
+                for ib = 1:obj.NB
+                    value{ib} = munow{ib}.*obj.mut_ratio_store{ib};
+                end
+            end
+        end
+
+        function value = get_mut_ratio(obj)
+            if ~isempty(obj.mut_ratio_store)
+                value = obj.mut_ratio_store;
+            else
+                mutnow = obj.mut;
+                munow = obj.mu;
+                for ib = 1:obj.NB
+                    value{ib} = mutnow{ib}./munow{ib};
+                end
+            end
+        end
+
+
+        function value = mut_opt_cleaned(obj,smoothwindow)
+
+            if nargin < 2
+            end
+
+            value = obj.mut;
+            
         end
             
         

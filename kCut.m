@@ -16,9 +16,12 @@ classdef kCut < flowSlice
         c;
         n;
         ssurf;          % Surface distance fron LE
-        vortZ;          % Z vorticity
         owrapblock = 0; % wall topology - 0 for channel, nb of last block in o
                         % grid for closed loop (eg blade profile)
+    end
+
+    properties (Dependent = true, Hidden = true)
+        vortZ;          % Z vorticity
     end
 
     methods
@@ -380,5 +383,36 @@ classdef kCut < flowSlice
             vol.ib = ib;
             vol.blk.nk = 1;
         end
+
+        function newFlow = interpOntoNewGrid(obj, newcase)
+            
+            newFlow = eval([class(obj) '(newcase.blk, newcase.gas, newcase.bcs)']);
+            p = properties(obj);
+
+            xv = [];
+            yv = [];
+
+            for ib = 1:obj.NB
+                xv = [xv; reshape(obj.blk.x{ib}, [], 1)];
+                yv = [yv; reshape(obj.blk.y{ib}, [], 1)];
+            end
+
+            for i=1:length(p)
+                if iscell(obj.(p{i})) && length(obj.(p{i})) == obj.NB
+                    fprintf('Interpolating %s\n', p{i})
+                    dv = [];
+                    for ib = 1:obj.NB
+                        dv = [dv; reshape(obj.(p{i}){ib}, [], 1)];
+                    end
+                    inds = ~isnan(dv);
+                    di = scatteredInterpolant(xv(inds),yv(inds),dv(inds),'linear','boundary');
+                    for ib = 1:obj.NB
+                        newFlow.(p{i}){ib} = di(newcase.blk.x{ib}, newcase.blk.y{ib});
+                    end
+                end
+            end
+
+        end
+
     end
 end

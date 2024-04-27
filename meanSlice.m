@@ -39,7 +39,6 @@ classdef meanSlice < aveSlice
         eta_Kol             % Kolmogorov scale
         cellSize_Kol;       % Cell size/ Kolmogorov scale
         mut_opt;
-        mut_opt_cleaned;
         tau_Re;
         tau_Re_an;          % Anisotropic componant of Re stress tensor
         tau_an_mag;         % Magnitude of anisotropic componant of Re stress
@@ -51,13 +50,13 @@ classdef meanSlice < aveSlice
     end
 
     methods
-        function obj = meanSlice(casedir, blk, gas, bcs, casetype, ishere)
+        function obj = meanSlice(blk, gas, bcs, casedir, casetype, ishere)
             obj@aveSlice(blk, gas, bcs);
             disp('Constructing meanSlice')
 
             if nargin > 0
 
-                if ~isempty(casedir) && nargin > 4
+                if nargin > 3 && ~isempty(casedir)
                     if ishere
                         basedir = casedir;
                     else
@@ -586,7 +585,11 @@ classdef meanSlice < aveSlice
             value = obj.mut_opt;
         end
         
-        function value = get.mut_opt_cleaned(obj)
+        function value = mut_opt_cleaned(obj, smoothwindow)
+
+            if nargin < 2
+                smoothwindow = 1;
+            end
 
             mtr = obj.mut_ratio{1}; 
             ynow = obj.blk.y{1};
@@ -599,7 +602,12 @@ classdef meanSlice < aveSlice
                 mtr(i,:) = min(mtr(i,:),lim);
             end
 
+            if smoothwindow > 1
+                mtr = smoothdata2(mtr, 'lowess',smoothwindow);
+            end
+
             value{1} = mtr.*obj.mu{1};
+            
 
         end
 

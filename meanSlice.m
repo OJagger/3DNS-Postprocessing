@@ -429,6 +429,9 @@ classdef meanSlice < aveSlice
                 tau(:,:,1,3) = -obj.roUddWdd{ib};
                 tau(:,:,3,1) = tau(:,:,1,3);
 
+                tau(:,:,2,3) = -obj.roVddWdd{ib};
+                tau(:,:,3,2) = tau(:,:,1,3);
+
                 value{ib} = tau;
             end
         end
@@ -489,7 +492,7 @@ classdef meanSlice < aveSlice
                 tau(:,:,3,1) = tau(:,:,1,3);
 
 
-                tau(:,:,2,3) = obj.roUddWdd{ib};
+                tau(:,:,2,3) = obj.roVddWdd{ib};
                 tau(:,:,3,2) = tau(:,:,2,3);
 
                 value{ib} = tau ./ obj.ro{ib};

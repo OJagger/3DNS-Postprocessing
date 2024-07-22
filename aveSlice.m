@@ -40,6 +40,7 @@ classdef aveSlice < kCut
         %BLedgeInd;      % j index of detected BL edge
         U;              % Wall-parallel velocity
         Ue;             % BL edge velocity
+        Me;             % BL edge Mach number
         Res;            % Surface distance Reynolds No
         blPr;           % Componant of cd due to production of tke
         blPr_eq;        % Coles' equilibrium prodution
@@ -70,7 +71,7 @@ classdef aveSlice < kCut
         function obj = aveSlice(blk, gas, bcs)
             obj@kCut(blk, gas, bcs);
             disp('Constructing aveSlice')
-            obj.nSmooth = 1;
+            obj.nSmooth = 10;
         end
 
         function getBCs(obj, inlet_blocks, is)
@@ -1072,12 +1073,22 @@ classdef aveSlice < kCut
         function value = get.Ue(obj)
             inds = obj.BLedgeInd;
             Unow = obj.U;
-            Misen = obj.Msurf;
-            Tisen = obj.T0in./(1+((obj.gas.gam-1)/2)*Misen.^2);
-            value = Misen.*sqrt(obj.gas.cp*(obj.gas.gam-1)*Tisen);                                               
-%             for i=1:length(inds)
-%                 value(i) = Unow(i,inds(i));
-%             end
+            % Misen = obj.Msurf;
+            % Tisen = obj.T0in./(1+((obj.gas.gam-1)/2)*Misen.^2);
+            % value = Misen.*sqrt(obj.gas.cp*(obj.gas.gam-1)*Tisen);                                               
+            for i=1:length(inds)
+                value(i) = Unow(i,inds(i));
+            end
+            value = obj.smooth_dist(value);
+        end
+
+        function value = get.Me(obj)
+            inds = obj.BLedgeInd;
+            Mnow = obj.oGridProp('M');                                             
+            for i=1:length(inds)
+                value(i) = Mnow(i,inds(i));
+            end
+            value = obj.smooth_dist(value);
         end
 
         function value = get.cf(obj)
@@ -1265,6 +1276,7 @@ classdef aveSlice < kCut
             mu_e = obj.gas.mu_ref*(Te/obj.gas.mu_tref).^(3/2).*...
                 (obj.gas.mu_tref+obj.gas.mu_cref)./(Te+obj.gas.mu_cref);
             value = mu_e./roe;
+            value = obj.smooth_dist(value);
         end
 
         function value = get.alpha2(obj)
@@ -1371,6 +1383,109 @@ classdef aveSlice < kCut
             value = obj.get_mut_ratio;
         end
 
-        
+        function sol = MISES_BL(obj, xstart, K, varargin)
+
+            data = [];
+            istart = obj.x2ind(xstart);
+            xsurf = obj.xSurf;
+            is = istart:length(xsurf);
+            xsurf = xsurf(is);
+            Me = obj.Msurf(is);
+            Ue = obj.Ue(is);
+            nue = obj.nu_e(is);
+
+            if nargin > 2 && ~isempty(K)
+                data.Kcorr = K.Kcorr;
+                data.Kd = K.Kd;
+                data.Kp = K.Kp;
+            end
+
+    
+            v = string(varargin);
+            if ismember("theta", v) || ismember("thick", v)
+                data.theta = obj.theta(is);
+            end
+            if ismember("delStar", v) || ismember("thick", v)
+                data.delStar = obj.delStar(is);
+            end
+            if ismember("H", v) || ismember("SFs", v)
+                data.H = obj.H(is);
+            end
+            if ismember("Hk", v) || ismember("SFs", v)
+                data.Hk = obj.H_k(is);
+            end
+            if ismember("H_ke", v) || ismember("SFs", v)
+                data.Hs = obj.H_ke(is);
+            end
+            if ismember("cf", v)
+                data.cf = obj.cf(is);
+            end
+
+            fun = @(x, y) MISES_ydash(x, y, xsurf, Me, Ue, nue, data);
+
+            Pr0 = obj.x2prop(xstart, 'blPr');
+            Us0 = MISES_correlations.fUs(obj.x2prop(xstart, 'H_ke'), ...
+                obj.x2prop(xstart, 'H_k'), ...
+                obj.x2prop(xstart, 'H'));
+
+
+            y0 = [obj.x2prop(xstart, 'theta'); ...
+                obj.x2prop(xstart, 'delStar'); ...
+                Pr0/(1-Us0)];
+
+            step = xsurf(2)-xsurf(1);
+            opts = odeset('InitialStep',step, 'MaxStep', 2*step, 'Stats','on');
+            sol = ode78(fun, xsurf, y0, opts);
+
+            if ismember("theta", v) || ismember("thick", v)
+                    sol.theta = interp1(xsurf, data.theta, sol.x);
+            else
+                sol.theta = sol.y(1,:);
+            end
+
+            if ismember("delStar", v) || ismember("thick", v)
+                sol.delStar = interp1(xsurf, data.delStar, sol.x);
+            else
+                sol.delStar = sol.y(2,:);
+            end
+
+            sol.ctau = sol.y(3,:);
+
+            sol.H = sol.delStar./sol.theta;
+            sol.Me = interp1(xsurf, Me, sol.x);
+            sol.Ue = interp1(xsurf, Ue, sol.x);
+            sol.nue = interp1(xsurf, nue, sol.x);
+            sol.Reth = sol.theta.*sol.Ue./sol.nue;
+            
+            
+            if ismember("Hk", v) || ismember("SFs", v)
+                sol.H_k = interp1(xsurf, data.Hk, sol.x);
+            else
+                sol.H_k = MISES_correlations.fHk(sol.Me, sol.H);
+            end
+
+            sol.H_ks = MISES_correlations.fHks(sol.H_k, sol.Reth);
+
+            if ismember("H_ke", v) || ismember("SFs", v)
+                sol.H_ke = interp1(xsurf, data.Hs, sol.x);
+            else
+                sol.H_ke = MISES_correlations.fHs(sol.Me, sol.H_ks);
+            end
+
+            sol.Hss = MISES_correlations.fHss(sol.Me, sol.H_k);
+
+            if ismember("cf", v)
+                sol.cf = interp1(xsurf, data.cf, sol.x);
+            else
+                sol.cf = MISES_correlations.fCf(sol.H_k, sol.Reth, sol.Me);
+            end
+
+            sol.Us = MISES_correlations.fUs(sol.H_ke, sol.H_k, sol.H);
+            sol.cd = MISES_correlations.fCd(sol.cf, sol.Us, sol.ctau);
+            sol.CtEQ = MISES_correlations.fCtEQ(sol.H_ke, sol.Us, sol.H, sol.H_k);
+            sol.del = MISES_correlations.fDel(sol.theta, sol.H_k, sol.delStar);
+            sol.Pr = sol.ctau.*(1-sol.Us);
+
+        end        
     end
 end

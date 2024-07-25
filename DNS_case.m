@@ -748,14 +748,21 @@ classdef DNS_case < handle
 
 
             R = [cosd(p.Results.rot) -sind(p.Results.rot); sind(p.Results.rot) cosd(p.Results.rot)];
-            ax = p.Results.ax;
+            ax = p.Results.ax(1);
+
+            f = gcf;
 
             if ischar(prop) || isstring(prop)
                 storedq = true;
                 if isempty(slice)
                     q = obj.(prop);
                 else
-                    q = slice.(prop);
+                    if strcmp(prop, "overlay")
+                        q = slice.schlieren;
+                        q2 = slice.vortZ;
+                    else
+                        q = slice.(prop);
+                    end
                 end
             else
                 storedq = false;
@@ -767,6 +774,7 @@ classdef DNS_case < handle
             if repeats > 2
                 offset = -obj.pitch;
             end
+            axes(ax);
             for ir = 1:repeats
             for i=1:obj.NB
 
@@ -793,7 +801,7 @@ classdef DNS_case < handle
             end
 
             if storedq
-                if string(prop) == "schlieren"
+                if string(prop) == "schlieren" || string(prop) == "overlay" 
                     colormap(gray)
                     map = colormap;
                     map = flip(map,1);
@@ -811,15 +819,91 @@ classdef DNS_case < handle
                 end
             end
                
+            colorbar('off');
             cb = colorbar;
-            if ~isempty(lims)
+            if string(prop) == "overlay"
+                if size(lims, 1) == 2
+                    caxis(lims(2, :));
+                else
+                    caxis([0 100]);
+                end
+            elseif ~isempty(lims)
                 caxis(lims);
+                
             end
+            
             if ~isempty(label)
                 cb.Label.Interpreter = 'latex';
                 cb.Label.String = label;
             end
             
+            if string(prop) == "overlay" 
+                h = findobj('Type', 'Axes');
+                if length(h) > 1
+                    ax2 = h(h~=ax);
+                    cla(ax2);
+                else
+                    ax2 = axes(f);
+                end
+
+                axes(ax2);
+                cla(ax2);
+
+                a =2000;
+                b = 2000;
+
+                maxnow = 0;
+
+                for ir = 1:repeats
+                    for i=1:obj.NB
+        
+                        xnow = obj.blk.x{i};
+                        ynow = obj.blk.y{i}+offset+(ir-1)*obj.pitch;
+                        ni = size(xnow,1);
+        
+                        coords = [reshape(xnow, 1, []); reshape(ynow, 1, [])];
+                        coords = R' * coords;
+        
+                        xnow = reshape(coords(1,:), ni, []);
+                        ynow = reshape(coords(2,:), ni, []);
+        
+                        om = abs(slice.vortZ{1});
+                        mask = 0.5*(1+tanh((om-a)/b));
+        
+                        s = pcolor(ax2, xnow, ynow, q2{i});
+                        alpha(s, mask);
+                        maxnow = max(maxnow, max(abs(q2{i}), [], 'all'));
+                    end
+                end
+
+                shading('interp')
+                axis equal
+                area = axis(ax);
+                aspect = [(area(2)-area(1)) (area(4)-area(3)) 1];
+                pbaspect(aspect);
+                axis off
+                colormap(ax2, redblue);
+                
+                if ~isempty(lims)
+                    caxis(lims(1,:));
+                else
+                    caxis([-maxnow maxnow]);
+                end
+
+
+                set(ax2, 'Position', get(ax, 'Position'));
+
+                f.SizeChangedFcn = @copy_fig_size;
+
+            end
+
+            function copy_fig_size(src, ~)
+                a2 = src.Children(end);
+                a1 = src.Children(1);
+                set(a2, 'Position', get(a1, 'Position'));
+            end
+
+
         end
 
         function p = plotInletProf(obj,slice,prop,ax)
@@ -853,47 +937,105 @@ classdef DNS_case < handle
 
         end
 
-        function flipbook(obj,slices, prop, ax, lims, label)
-            if nargin < 4 || isempty(ax)
-                ax = gca;
-            end
-            if nargin < 5 || isempty(lims)
-                lims = [];
-                switch prop
-                    case 'M'
-                        lims = [0 1.6];
-                    case 'tau_w'
-                        lims = [0 800];
-                    case 'vortZ'
-                        lims = 1e5*[-0.7 0.7];
-                    case 'w'
-                        lims = [-3 3];
-                end
-            end
-            if nargin < 6 || isempty(label)
-                label = [];
-                switch prop
-                    case 'M'
-                        label = '$M$';
-                    case 'tau_w'
-                        label = '$\tau_w$';
-                    case 'vortZ'
-                        label = '$\omega_z$';
-                end
-            end
-            for i=1:length(slices)
-                cla(ax);
-                switch class(slices(i))
-                    case 'kSlice'
-                        obj.kPlot(slices(i),prop,'ax',ax,'lims',lims,'label',label)
-                    case 'jSlice'
-                        obj.jPlot(slices(i),prop,ax,lims,label)
-                end
-                title(sprintf('Slice %d/%d', i, length(slices)))
-                pause
+        function flipbook(obj,slices, prop, varargin)
+
+            p = inputParser;
+
+            defaultAx = gca;
+
+            switch prop
+                case 'M'
+                    defaultLims = [0 1.6];
+                case 'tau_w'
+                    defaultLims = [0 800];
+                case 'vortZ'
+                    defaultLims = 1e5*[-0.7 0.7];
+                case 'w'
+                    defaultLims = [-3 3];
+                case 'schlieren'
+                    defaultLims = [0 100];
+                case 'overlay'
+                    defaultLims = [-0.7e5 0.7e5; 0 100];
+                otherwise
+                    defaultLims = [];
             end
 
-            function update_plot()
+            switch prop
+                case 'M'
+                    defaultLabel = '$M$';
+                case 'tau_w'
+                    defaultLabel = '$\tau_w$';
+                case 'vortZ'
+                    defaultLabel = '$\omega_z$';
+                otherwise
+                    defaultLabel = [];
+            end
+
+            if ~isempty(obj.blk.viewarea)
+                defaultViewArea = obj.blk.viewarea;
+            else
+                defaultViewArea = [];
+            end
+            if isfield(obj.blk, "n_pitchwise_repeats")
+                defaultRepeats = obj.blk.n_pitchwise_repeats;
+            else
+                defaultRepeats = 1;
+            end
+            defaultRot = 0;
+
+            p = inputParser;
+
+            addParameter(p, 'ax', defaultAx);
+            addParameter(p, 'lims', defaultLims);
+            addParameter(p, 'label', defaultLabel);
+            addParameter(p, 'viewarea', defaultViewArea);
+            addParameter(p, 'nrepeats', defaultRepeats);
+            addParameter(p, 'rot', defaultRot);
+            addParameter(p, 'Interpreter', 'none');
+            addParameter(p, 'ColorMap', 'parula')
+
+            parse(p, varargin{:});
+
+            lims = p.Results.lims;
+            label = p.Results.label;
+            repeats = p.Results.nrepeats;
+            ax = p.Results.ax;
+
+            axes(ax)
+            f = gcf;
+            f.UserData.slices = slices;
+            f.UserData.ax = ax;
+            f.UserData.homeArea = p.Results.viewarea;
+            f.KeyPressFcn = @update_plot;
+            f.UserData.i = 1;
+            cla(ax);
+
+            switch class(slices(1))
+                case 'kSlice'
+                    f.UserData.plotfcn = @(slice, area) obj.kPlot(slice,prop,'ax',ax,'lims',lims,'label',label, 'viewarea', area);
+                case 'jSlice'
+                    f.UserData.plotfcn = @(slice, area) obj.jPlot(slice,prop,ax,lims,label);
+            end
+
+            f.UserData.plotfcn(slices(1), p.Results.viewarea);
+            title(ax, sprintf('Slice %d (%d/%d)', slices(1).nSlice, 1, length(slices)))
+
+            function update_plot(src, event)
+
+                area = axis(src.UserData.ax);
+                switch event.Key
+                    case 'leftarrow'
+                        src.UserData.i = max(1, src.UserData.i - 1);
+                    case 'rightarrow'
+                        src.UserData.i = min(length(src.UserData.slices), src.UserData.i + 1);
+                    case 'uparrow'
+                        area = src.UserData.homeArea;
+                end
+
+                
+                src.UserData.plotfcn(src.UserData.slices(src.UserData.i), area)
+                delete(src.UserData.ax.Children(end));
+                title(src.UserData.ax, sprintf('Slice %d (%d/%d)', src.UserData.slices(1).nSlice, src.UserData.i, length(src.UserData.slices)));
 
             end
         end

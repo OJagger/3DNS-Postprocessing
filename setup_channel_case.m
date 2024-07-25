@@ -22,6 +22,7 @@ function newcase = setup_channel_case(name, path, blk, Min, theta, varargin)
     bcs.nturb = 100;
     bcs.iradprof = 0;
     bcs.g_z = 0;
+    bcs.theta = theta;
 
     solver.nkprocs = 1;
     solver.nk = blk.nk;
@@ -36,7 +37,7 @@ function newcase = setup_channel_case(name, path, blk, Min, theta, varargin)
     solver.istats = 0;
     solver.istability = 0;
     solver.ilam = 1;
-    solver.npp = 1;
+    solver.npp = blk.nk;
 
 
     gas.gam = 1.4;
@@ -61,10 +62,10 @@ function newcase = setup_channel_case(name, path, blk, Min, theta, varargin)
             fprintf('Must specify either Reth mu_ref at inlet\n');
             return
         else
-            bcs.mu_ref = p.Results.mu_ref;         
+            gas.mu_ref = p.Results.mu_ref;         
         end
     else
-        mu_in = theta*bc.vin/p.Results.Reth;
+        mu_in = theta*bcs.vin/p.Results.Reth;
         gas.mu_ref = sutherland_mu_ref(mu_in, Tin, gas.mu_cref, gas.mu_tref);
     end
 
@@ -74,7 +75,7 @@ function newcase = setup_channel_case(name, path, blk, Min, theta, varargin)
     newcase.gas = gas;
     newcase.solver = solver;
     newcase.bcs = bcs;
-    newcase.casepath = path;
+    newcase.casepath = fullfile(path, name);
     newcase.casetype = 'gpu';
 
 end

@@ -1012,7 +1012,7 @@ classdef DNS_case < handle
 
             switch class(slices(1))
                 case 'kSlice'
-                    f.UserData.plotfcn = @(slice, area) obj.kPlot(slice,prop,'ax',ax,'lims',lims,'label',label, 'viewarea', area);
+                    f.UserData.plotfcn = @(slice, area) obj.kPlot(slice,prop,'ax',ax,'lims',lims,'label',label, 'viewarea', area, 'nrepeats', repeats);
                 case 'jSlice'
                     f.UserData.plotfcn = @(slice, area) obj.jPlot(slice,prop,ax,lims,label);
             end
@@ -1032,10 +1032,10 @@ classdef DNS_case < handle
                         area = src.UserData.homeArea;
                 end
 
-                
+                % cla(src.UserData.ax)
                 src.UserData.plotfcn(src.UserData.slices(src.UserData.i), area)
-                delete(src.UserData.ax.Children(end));
-                title(src.UserData.ax, sprintf('Slice %d (%d/%d)', src.UserData.slices(1).nSlice, src.UserData.i, length(src.UserData.slices)));
+                delete(src.UserData.ax.Children(end-(p.Results.nrepeats*obj.NB)+1:end));
+                title(src.UserData.ax, sprintf('Slice %d (%d/%d)', src.UserData.slices(src.UserData.i).nSlice, src.UserData.i, length(src.UserData.slices)));
 
             end
         end
@@ -3139,5 +3139,6 @@ classdef DNS_case < handle
             obj.bcs.pexit = obj.bcs.Poin*p_p0(M, obj.gas.gam);
             obj.writeInputFiles;
         end
+
     end
 end

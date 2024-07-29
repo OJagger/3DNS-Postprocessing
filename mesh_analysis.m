@@ -82,9 +82,9 @@ axis equal
 % 
 % axis equal
 
-x = blk.x{6}(:,1,1);
-y = blk.y{6}(:,1,1);
-dx_surf = (x(end)-x(1))/length(x);
+% x = blk.x{6}(:,1,1);
+% y = blk.y{6}(:,1,1);
+% dx_surf = (x(end)-x(1))/length(x);
 
 
 %%
@@ -171,6 +171,9 @@ if NB == 12
 elseif NB == 9
     oblocks = [3 5 7 4];
     oblocks_flip = [0, 0, 1, 1];
+else
+    oblocks = 1:legnth(blk.x);
+    oblocks_flip(1:legnth(blk.x)) = 0;
 end
     
 for i=1:length(oblocks)

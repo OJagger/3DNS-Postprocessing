@@ -77,5 +77,7 @@ function newcase = setup_channel_case(name, path, blk, Min, theta, varargin)
     newcase.bcs = bcs;
     newcase.casepath = fullfile(path, name);
     newcase.casetype = 'gpu';
+    newcase.nbi = blk.nbi;
+    newcase.nbj = blk.nbj;
 
 end

@@ -193,7 +193,7 @@ function rcase = read_case(casename, type, run)
             f = fopen(fpath);
         
             tmp = str2num(char(split(fgetl(f))));
-            NB = tmp(1); solver.nkprocs = tmp(1);
+            NB = tmp(1); solver.nkprocs = tmp(2);
             nprocs=0;
             npoints=0;
             inlet_blks = [];

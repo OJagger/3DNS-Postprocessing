@@ -94,7 +94,7 @@ classdef DNS_channel < DNS_case
                 prop = props{ip};
                 fprintf('Interpolating %s\n', prop);
                 propnow = obj.concat_prop(obj.instFlow.(prop));
-                
+
                 for j = 1:newCase.nbj
                     for i = 1:newCase.nbi
                         ib = i+(j-1)*newCase.nbi;
@@ -112,13 +112,14 @@ classdef DNS_channel < DNS_case
                         clear data
                     end
                 end
-                
+
                 clear propnow
             end
 
             for i=1:ib
                 flow = volFlowBlock();
                 for ip = 1:length(props)
+                    fprintf('Reading %s, block %d\n',[props{ip}, ib])
                     prop = props{ip};
                     data = load(fullfile(newCase.casepath,sprintf('block_%d_%s.mat',[i, prop])));
                     flow.(prop) = data;
@@ -840,6 +841,48 @@ classdef DNS_channel < DNS_case
                 fclose(f);
     
             end
+
+        end
+
+        function plotYWall(obj)
+
+            dy = [];
+            s = [];
+
+            for i = 1:length(obj.blk.oblocks)
+                ib = obj.blk.oblocks(i);
+                flip = obj.blk.oblocks_flip(i);
+                if obj.blk.next_patch{ib}.jm == 3
+                    xwall = obj.blk.x{ib}(:,1);
+                    x1 = obj.blk.x{ib}(:,2);
+                    ywall = obj.blk.y{ib}(:,1);
+                    y1 = obj.blk.y{ib}(:,2);
+                else
+                    xwall = obj.blk.x{ib}(:,end);
+                    x1 = obj.blk.x{ib}(:,end-1);
+                    ywall = obj.blk.y{ib}(:,end);
+                    y1 = obj.blk.y{ib}(:,end-1);
+                end
+                
+                dynow = sqrt((xwall-x1).^2 + (ywall-y1).^2);
+                snow = curve_length(xwall, ywall);
+                if flip
+                    snow = flip(snow);
+                    dynow = flip(dynow);
+                end
+
+                dynow = reshape(dynow,1,[]);
+
+                dy = [dy dynow];
+                if isempty(s)
+                    s = snow;
+                else
+                    s = [s snow+s(end)];
+                end
+                    
+            end
+
+            plot(s, dy)
 
         end
 

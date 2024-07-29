@@ -10,10 +10,12 @@ for i=1:NB
     xnew = blk.x{i};
     ynew = blk.y{i};
     [ni,nj] = size(xnew);
-    is = 1:skip:ni;
+    is = round(linspace(1, ni, ni/skip));
+    % is = 1:skip:ni;
     is = [is(1:end-1) ni];
-    js = 1:skip:nj;
-    js = [js(1:end-1) nj];
+    js = round(linspace(1, nj, nj/skip));
+    % js = 1:skip:nj;
+    % js = [js(1:end-1) nj];
     xnew = xnew(is, js);
     ynew = ynew(is,js);
     plot(xnew,ynew,'k');

@@ -35,6 +35,7 @@ classdef DNS_case < handle
         kSlices = kSlice.empty;
         inflowTurb = volTurbulence.empty;
         spanAveFlow = kSlice.empty
+        inletProf = inletProfile.empty;
         RANSSlices;
         trip;
         iTrip = false;
@@ -922,7 +923,7 @@ classdef DNS_case < handle
 
         end
 
-        function [q,ynow] = inletProf(obj,slice,prop)
+        function [q,ynow] = getInletProf(obj,slice,prop)
             propnow = [];
             ynow = [];
             for nb = obj.blk.inlet_blocks{1}
@@ -1512,6 +1513,18 @@ classdef DNS_case < handle
                     plot(U/max(U), ynow)
                 end
             end
+        end
+
+        function readInletProfile(obj)
+
+            obj.inletProf = inletProfile(obj.blk, obj.gas, obj.bcs, obj.runpath);
+
+        end
+
+        function writeInletProfile(obj)
+
+            obj.inletProf.writeProf(obj.runpath);
+
         end
 
         function readTrip(obj)

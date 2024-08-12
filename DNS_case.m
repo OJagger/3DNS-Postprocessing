@@ -2626,21 +2626,67 @@ classdef DNS_case < handle
 
         end
 
-        function writeMovie(obj, slices, prop, lims, label, area, name, framerate)
+        function writeMovie(obj, slices, prop, varargin)
             
-            replot = false;
 
-            if nargin < 8
-                framerate = 10;
-            end
-            if nargin < 6 || isempty(area)
-                area = obj.blk.viewarea;
-                aspect = obj.blk.aspect;
+            defaultLims = [];
+            defaultLabel = [];
+            if ~isempty(obj.blk.viewarea)
+                defaultViewArea = obj.blk.viewarea;
             else
-                aspect = [(area(2)-area(1))...
-                    (area(4)-area(3)) 1];
+                defaultViewArea = [];
             end
-            if nargin < 4 || isempty(lims)
+            if isfield(obj.blk, "n_pitchwise_repeats")
+                defaultRepeats = obj.blk.n_pitchwise_repeats;
+            else
+                defaultRepeats = 1;
+            end
+            defaultRot = 0;
+
+            p = inputParser;
+
+            
+            addRequired(p, 'slices', @slicesValidationFcn)
+            addRequired(p, 'prop', @ischar);
+            addParameter(p, 'lims', defaultLims);
+            addParameter(p, 'label', defaultLabel);
+            addParameter(p, 'viewarea', defaultViewArea);
+            addParameter(p, 'nrepeats', defaultRepeats);
+            addParameter(p, 'rot', defaultRot);
+            addParameter(p, 'Interpreter', 'none');
+            addParameter(p, 'ColorMap', 'parula')
+            addParameter(p, 'name', []);
+            addParameter(p, 'framerate', 10);
+            addParameter(p, 'replot', false);
+
+            function val = slicesValidationFcn(slices)
+                
+                if ischar(slices) || isstring(slices)
+                    if ismember(string(slices), ["kSlices", "jSlices"])
+                        val = true;
+                    else
+                        disp('Slices string must be "kSlices" or "jSlices"');
+                        val = false;
+                    end
+                elseif ismember(string(class(slices)), ["kSlice", "jSlice"])
+                    val = true;
+                else
+                    disp('Slices must be list of kSlices or jSlices');
+                    val = false;
+                end
+
+            end
+
+            parse(p, slices, prop, varargin{:});
+
+            lims = p.Results.lims;
+            label = p.Results.label;
+            repeats = p.Results.nrepeats;
+            framerate = p.Results.framerate;
+            area = p.Results.viewarea;
+            aspect = [(area(2)-area(1))...
+                (area(4)-area(3)) 1];
+            if isempty(lims)
                 switch prop
                     case 'M'
                         lims = [0 1.4];
@@ -2656,7 +2702,7 @@ classdef DNS_case < handle
                         lims = [];
                 end
             end
-            if nargin < 5 || isempty(label)
+            if isempty(label)
                 switch prop
                     case 'M'
                         label = 'M';
@@ -2669,10 +2715,6 @@ classdef DNS_case < handle
                 end
             end
 
-%             p = gcp('nocreate');
-%             if isempty(p)
-%                 parpool(16);
-%             end
             readSlices = false;
             switch class(slices(1))
                 case 'kSlice'
@@ -2702,10 +2744,10 @@ classdef DNS_case < handle
             else
                 vname = ['/run' num2str(obj.run(1)) '-' num2str(obj.run(end))];
             end
-            if nargin < 7 || isempty(name)
+            if isempty(p.Results.name)
                 vname = [vname '_' var '.mp4"'];
             else
-                vname = ['/run' num2str(obj.run(end)) '_' name '.mp4"'];
+                vname = ['/run' num2str(obj.run(end)) '_' p.Results.name '.mp4"'];
             end
 
             tempfolder = fullfile(obj.runpath,'temp');
@@ -2731,7 +2773,7 @@ classdef DNS_case < handle
 
                 % Get path of frame and check if already plotted
                 fname = fullfile(imgfolder,sprintf('img_%03d.png',nSlice));
-                if ~exist(fname,'file') || replot
+                if ~exist(fname,'file') || p.Results.replot
 
                     % Get slice to contour
                     if readSlices

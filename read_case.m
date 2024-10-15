@@ -174,6 +174,8 @@ function rcase = read_case(casename, type, run)
             end
         
             blk = read_grid(casename);
+            blk.blockdims(:,3) = nk
+            blk.nk = nk
             blk.span = solver.span;
             blk.npp = solver.npp;
         
@@ -189,7 +191,7 @@ function rcase = read_case(casename, type, run)
 
         case 'gpu'
 
-            fpath = fullfile(base, casename, 'input_gpu.txt');
+            fpath = fullfile(base, casename, runpath, 'input_gpu.txt');
             f = fopen(fpath);
         
             tmp = str2num(char(split(fgetl(f))));
@@ -360,6 +362,8 @@ function rcase = read_case(casename, type, run)
             end
         
             blk = read_grid(casename);
+            blk.nk = nk;
+            blk.blockdims(:,3) = nk;
             blk.span = solver.span;
             blk.npp = solver.npp;
             blk.nbg = nBlockGroups;

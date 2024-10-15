@@ -1,6 +1,6 @@
 function mesh_analysis(blk, skip, Re)
 
-if nargin < 3, Re=100e3; end
+if nargin < 3, Re=800e3; end
 
 if nargin<2, skip=8; end
 
@@ -16,7 +16,7 @@ catch
 end
 
 nij_pts = 0;
-figure(1)
+figure
 hold on
 for i=1:NB
     x = blk.x{i};
@@ -88,7 +88,7 @@ axis equal
 
 
 %%
-figure(2)
+figure
 hold on
 i=3;
 skip = 8;
@@ -118,7 +118,7 @@ end
 
 %% Cell aspect ratio
 
-figure(3)
+figure
 hold on
 for i=1:NB
     x = blk.x{i};
@@ -232,7 +232,7 @@ expansion_r = dy_bl(2:end)./dy_bl(1:end-1);
 % set(gca,'FontSize',16)
 % grid on
 
-figure(5)
+figure
 plot(2:length(expansion_r)+1,expansion_r)
 xlabel('y point')
 ylabel('O grid expansion ratio')
@@ -312,11 +312,13 @@ dn = sqrt(dx.^2 + dy.^2);
 dn = dn(iLE:iTE);
 xnow = xo(iLE:iTE);
 
-figure()
+figure
 yyaxis left
 plot(xnow, dn/yp1);
 yyaxis right
 plot(xnow, ds/yp1);
+hold on
+yline(dz/yp1, '--')
 
 %%
 

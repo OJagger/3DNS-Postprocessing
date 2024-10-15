@@ -1,15 +1,12 @@
-function write_case(casename,blk,bcs,gas,solver,topology,nkproc, varargin)
+function write_case(casename,blk,bcs,gas,solver,nkproc, varargin)
 
 p = inputParser;
 addParameter(p, 'casetype', 'both');
 parse(p, varargin{:})
 nargin
-if nargin < 7 || ~exist('nkproc','var')
+if nargin < 6 || ~exist('nkproc','var')
     nkproc = ceil(solver.nk/solver.npp);
     fprintf('k procs: %d\n', nkproc)
-end
-if nargin < 6
-    topology = [];
 end
 
 if ~isfield(gas,'gamma')

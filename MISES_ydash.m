@@ -1,5 +1,8 @@
 function [ydash] = MISES_ydash(x, y, xsurf, Me, Ue, nue, data)
 
+    Me = reshape(Me, [], 1);
+    % Ue = reshape(Ue, [], 1);
+
     ydash = zeros(3,1);
 
     dUdx = (Ue(3:end)-Ue(1:end-2))./(xsurf(3:end)-xsurf(1:end-2));
@@ -22,33 +25,42 @@ function [ydash] = MISES_ydash(x, y, xsurf, Me, Ue, nue, data)
         theta = y(1);
     end
 
-    if isfield(data, "delStar")
-        delStar = interp1(xsurf, data.delStar, x);
-    else
-        delStar = y(2);
-    end
-
     Reth = theta*Uea/nuea;
 
-    if isfield(data, "H")
-        H = interp1(xsurf, data.H, x);
+    if isfield(data, "Hs")
+        Hs = interp1(xsurf, data.Hs, x);
     else
-        H = delStar/theta;
+        Hs = y(2);
     end
+
+    Hks = MISES_correlations.fHks_Hs(Hs, Ma);
 
     if isfield(data, "Hk")
         Hk = interp1(xsurf, data.Hk, x);
     else
-        Hk = MISES_correlations.fHk(Ma, H);
+        Hk = MISES_correlations.fHk_Hks(Hks, Reth);
     end
 
-    Hks = MISES_correlations.fHks(Hk, Reth);
-
-    if isfield(data, "Hs")
-        Hs = interp1(xsurf, data.Hk, x);
+    if isfield(data, "H")
+        H = interp1(xsurf, data.H, x);
     else
-        Hs = MISES_correlations.fHs(Ma, Hks);
+        H = MISES_correlations.fH(Ma, Hk);
     end
+
+    if isfield(data, "delStar")
+        delStar = interp1(xsurf, data.delStar, x);
+        H = delStar/theta;
+    else
+        delStar = H*theta;
+    end
+
+    % Hks = MISES_correlations.fHks(Hk, Reth);
+
+    % if isfield(data, "Hs")
+    %     Hs = interp1(xsurf, data.Hk, x);
+    % else
+    %     Hs = MISES_correlations.fHs(Ma, Hks);
+    % end
 
     Hss = MISES_correlations.fHss(Ma, Hk);
 
@@ -65,24 +77,27 @@ function [ydash] = MISES_ydash(x, y, xsurf, Me, Ue, nue, data)
 
     ydash(1) = cf/2 - (H + 2 - Ma^2)*(theta/Uea)*dUdx;
 
-    dHsdx = 2*Cd/theta - Hs*cf/(2*theta) - dUdx*(2*Hss + Hs*(1-H))/Uea;
-    
-    delThick = 5e-6;                                                           % Change in quantities for differencing
-    delM = 1e-3;
+    % dHsdx = 2*Cd/theta - Hs*cf/(2*theta) - dUdx*(2*Hss + Hs*(1-H))/Uea;
+    % 
+    % delThick = 5e-12;                                                           % Change in quantities for differencing
+    % delM = 1e-3;
+    % 
+    % Hs1 = MISES_correlations.fHs_ds(delStar+delThick, theta, Ma, Reth);
+    % Hs0 = MISES_correlations.fHs_ds(delStar-delThick, theta, Ma, Reth);
+    % dHs_dds = (Hs1-Hs0)/(2*delThick);                                          % Partial derivative of Hs wrt delta star.
+    % 
+    % Hs1 = MISES_correlations.fHs_ds(delStar, theta+delThick, Ma, Reth);
+    % Hs0 = MISES_correlations.fHs_ds(delStar, theta-delThick, Ma, Reth);
+    % dHs_dtheta = (Hs1-Hs0)/(2*delThick);                                       % Partial derivative of Hs wrt theta.
+    % 
+    % Hs1 = MISES_correlations.fHs_ds(delStar, theta, Ma+delM, Reth);
+    % Hs0 = MISES_correlations.fHs_ds(delStar, theta, Ma-delM, Reth);
+    % dHs_dMe = (Hs1-Hs0)/(2*delM);                                          % Partial derivative of Hs wrt Me.
+    % 
+    % ydash(2) = (dHsdx - dHs_dtheta*ydash(1) - dHs_dMe*dMdx)/dHs_dds;
 
-    Hs1 = MISES_correlations.fHs_ds(delStar+delThick, theta, Ma, Reth);
-    Hs0 = MISES_correlations.fHs_ds(delStar-delThick, theta, Ma, Reth);
-    dHs_dds = (Hs1-Hs0)/(2*delThick);                                          % Partial derivative of Hs wrt delta star.
-
-    Hs1 = MISES_correlations.fHs_ds(delStar, theta+delThick, Ma, Reth);
-    Hs0 = MISES_correlations.fHs_ds(delStar, theta-delThick, Ma, Reth);
-    dHs_dtheta = (Hs1-Hs0)/(2*delThick);                                       % Partial derivative of Hs wrt theta.
-
-    Hs1 = MISES_correlations.fHs_ds(delStar, theta, Ma+delM, Reth);
-    Hs0 = MISES_correlations.fHs_ds(delStar, theta, Ma-delM, Reth);
-    dHs_dMe = (Hs1-Hs0)/(2*delM);                                          % Partial derivative of Hs wrt Me.
-
-    ydash(2) = (dHsdx - dHs_dtheta*ydash(1) - dHs_dMe*dMdx)/dHs_dds;
+    ydash(2) = (2*Cd - Hs*cf/2 - (2*Hss+Hs*(1-H))*(theta/Uea)*dUdx) ...
+        / theta;
 
     % Set Kcorr value to default or custom
     if isfield(data, "Kcorr")
@@ -112,4 +127,8 @@ function [ydash] = MISES_ydash(x, y, xsurf, Me, Ue, nue, data)
         Kcorr*(sqrt(CtEQ) - sqrt(y(3))) ...
         + Kd*2*del*H/(B*theta)*(cf/2 - ((Hk - 1)/(A*Hk))^2) ...
         - Kp*2*(del/Uea)*dUdx);
+
+    if x>0.3716
+        disp('');
+    end
 end

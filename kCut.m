@@ -13,6 +13,7 @@ classdef kCut < flowSlice
         oblocks_flip;
         iLE;
         iTE;
+        niBL;
         c;
         n;
         ssurf;          % Surface distance fron LE
@@ -22,6 +23,7 @@ classdef kCut < flowSlice
 
     properties (Dependent = true, Hidden = true)
         vortZ;          % Z vorticity
+        aspect_ratio;
     end
 
     methods
@@ -96,7 +98,7 @@ classdef kCut < flowSlice
                     obj.iO = io(obj.iLE:obj.iTE,:);
                     obj.jO = jo(obj.iLE:obj.iTE,:);
                     obj.blkO = blko(obj.iLE:obj.iTE,:);
-                    obj.c = sqrt((obj.xO(end,end) - obj.xO(end,1))^2 + (obj.yO(end,end) - obj.yO(end,1))^2);
+                    obj.c = sqrt((obj.xO(end,1) - obj.xO(1,1))^2 + (obj.yO(end,1) - obj.yO(1,1))^2);
                     %obj.xSurf = xsurf([obj.iLE:-1:1 end:-1:obj.iTE]);
                     %size(obj.xSurf)
                     R = [0 -1; 1 0];
@@ -132,6 +134,7 @@ classdef kCut < flowSlice
                             obj.ssurf(i+1-obj.iLE) = obj.ssurf(i-obj.iLE) + ds;
                         end
                     end
+                    obj.niBL = length(obj.xSurf);
                 else
                     obj.gas = gas;
                     obj.gas.rgas = obj.gas.cp*(1-1/obj.gas.gam);
@@ -173,9 +176,12 @@ classdef kCut < flowSlice
         function blfield = oGridProp(obj, prop)
             %OGRIDPROP Construct array of property in o grid for one surface
             %of blade
+
+            propnow = obj.(prop);
+            if ~iscell(propnow)
             
-            if any(strcmp(["U","dsdy","yBL","yplus"], prop))
-                blfield = obj.(prop);
+            %if any(strcmp(["U","dsdy","yBL","yplus"], prop))
+                blfield = propnow;
             else
                 blfield = [];
                 propnow = obj.(prop);

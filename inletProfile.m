@@ -18,10 +18,19 @@ classdef inletProfile < handle
     properties (Dependent = true, Hidden = true)
         M;
         p;
+        T;
         u;
         v;
         ro;
         vel;
+        U;
+        p0;
+        T0;
+        del995;
+        jEdge;
+        delStar;
+        theta;
+        H;
     end
         
     methods
@@ -69,13 +78,84 @@ classdef inletProfile < handle
             value = obj.bcs.vin*obj.vel_prof;
         end
 
+        function value = get.U(obj)
+            value = obj.bcs.vin*obj.vel_prof;
+        end
+
+        function value = get.p0(obj)
+            value = obj.bcs.Poin*obj.po_prof;
+        end
+
+        function value = get.p(obj)
+            value = obj.p0.*p_p0(obj.M, obj.gas.gam);
+        end
+
+        function value = get.T0(obj)
+            value = obj.bcs.Toin*obj.To_prof;
+        end
+
+        function value = get.T(obj)
+            value = obj.T0.*T_T0(obj.M, obj.gas.gam);
+        end
+
         function value = get.M(obj)
-
-            Po = obj.bcs.Toin*obj.po_prof;
+            Po = obj.bcs.Poin*obj.po_prof;
             To = obj.bcs.Toin*obj.To_prof;
-
             value = M_VT0(obj.vel, To, obj.gas.gam, obj.gas.cp);
+        end
 
+        function value = get.ro(obj)
+            rgas = obj.gas.cp * (obj.gas.gam - 1)/obj.gas.gam;
+            value = obj.p./obj.T/rgas;
+        end
+
+
+        function value = get.jEdge(obj)
+            unow = obj.u;
+            Ue = max(unow);
+            jEdge = 1;
+            while unow(jEdge) < Ue*0.995
+                jEdge = jEdge+1;
+            end
+            value = jEdge;
+        end
+
+        function value = get.del995(obj)
+            value = obj.y(obj.jEdge);
+        end
+
+        function value = get.theta(obj)
+            
+            ye = 1.1*obj.del995;
+            [~, jLim] = min(abs(obj.y - ye));
+
+            Uprof = obj.u(1:jLim);
+            roprof = obj.ro(1:jLim);
+            [Ue, je] = max(Uprof);
+            roe = roprof(je);
+
+            integrand = (roprof.*Uprof/(roe*Ue)).*(1-Uprof/Ue);
+            value = trapz(obj.y(1:jLim), integrand);
+
+        end
+
+        function value = get.delStar(obj)
+            
+            ye = 1.1*obj.del995;
+            [~, jLim] = min(abs(obj.y - ye));
+
+            Uprof = obj.u(1:jLim);
+            roprof = obj.ro(1:jLim);
+            [Ue, je] = max(Uprof);
+            roe = roprof(je);
+
+            integrand = 1- roprof.*Uprof/(roe*Ue);
+            value = trapz(obj.y(1:jLim), integrand);
+
+        end
+
+        function value = get.H(obj)
+            value = obj.delStar/obj.theta;
         end
             
 
@@ -103,6 +183,8 @@ classdef inletProfile < handle
 
             if ~isempty(p.Results.yEdge)
                 yEdge = p.Results.yEdge;
+            elseif p.Results.normaliseY
+                yEdge = obj.del995;
             else
                 yEdge = 1;
             end
@@ -114,9 +196,13 @@ classdef inletProfile < handle
             end
 
 
-            s = plot(p.Results.ax, q/scale, obj.y/yEdge, ...                       % corresponding y vals
-                p.Results.fmt, ...                                                                      % Set format string
-                'LineWidth', p.Results.LineWidth);
+            if isscalar(q)
+                s = yline(p.Results.ax, q/yEdge, p.Results.fmt);
+            else
+                s = plot(p.Results.ax, q/scale, obj.y/yEdge, ...                       % corresponding y vals
+                    p.Results.fmt, ...                                                                      % Set format string
+                    'LineWidth', p.Results.LineWidth);
+            end
 
         end
 
@@ -125,7 +211,7 @@ classdef inletProfile < handle
             f = fopen(fullfile(path, 'inlet_profile.txt'), 'w');
 
             fprintf(f,'%d %8.6f\n', [obj.nrelax, obj.urf]);
-            fprintf(f,'%8.6f %8.6f %8.6f %8.6f %8.6f\n', [obj.y; obj.vel_prof; obj.po_prof; obj.To_prof; obj.alpha]);
+            fprintf(f,'%8.6f %8.6f %8.6f %8.6f\n', [obj.vel_prof; obj.po_prof; obj.To_prof; obj.alpha]);
             fclose(f)
 
         end

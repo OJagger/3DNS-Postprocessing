@@ -12,6 +12,7 @@ classdef aveSlice < kCut
         dsdyThresh;% = -50;
         use_unsflo = false;
         blEdgeMode;
+        blEdgeStore = [];
         iSmoothBL =  false;
         nSmooth;
         label;
@@ -44,6 +45,8 @@ classdef aveSlice < kCut
         Res;            % Surface distance Reynolds No
         blPr;           % Componant of cd due to production of tke
         blPr_eq;        % Coles' equilibrium prodution
+        cd_inner;       % Componant of cd dow to mean strain
+        cd;             % Dissipation coefficient
         tau_w;          % Wall shear stress
         u_tau;          % Friction velocity
         dUdy;
@@ -71,7 +74,7 @@ classdef aveSlice < kCut
         function obj = aveSlice(blk, gas, bcs)
             obj@kCut(blk, gas, bcs);
             disp('Constructing aveSlice')
-            obj.nSmooth = 10;
+            obj.nSmooth = round(obj.niBL/50);
         end
 
         function getBCs(obj, inlet_blocks, is)
@@ -194,15 +197,23 @@ classdef aveSlice < kCut
         end
        
 
-        function value = BLedgeInd(obj, mode)
+        function value = BLedgeInd(obj, mode, debug)
             if nargin < 2 || isempty(mode)
-                if ~isempty(obj.blEdgeMode)
-                    mode = obj.blEdgeMode;
+                if ~isempty(obj.blEdgeStore)
+                    value = obj.blEdgeStore;
+                    return
                 else
-                    mode = "sCombined";
+                    if ~isempty(obj.blEdgeMode)
+                        mode = obj.blEdgeMode;
+                    else
+                        mode = "sCombined";
+                    end
                 end
             end
-            u = obj.oGridProp('U');
+            if nargin < 3 || isempty(debug)
+                debug = false;
+            end
+            
             fprintf('BL edge detection mode: %s\n',mode)
             switch mode
                 case "sGradThresh"
@@ -242,7 +253,6 @@ classdef aveSlice < kCut
                     dsdy = obj.dsdy;
                     for i=1:size(snow,1)
 
-                        sthresh  = 0.02*max(abs(snow(i,:)));
                         
                         if isempty(obj.dsdyThresh)
                             dsdythresh = -0.02*max(abs(dsdy(i,:)));% + 0.98*(temp(i,ceil(size(temp,2)/2))-temp(i,1));
@@ -250,8 +260,14 @@ classdef aveSlice < kCut
                             dsdythresh = obj.dsdyThresh;
                         end
 
+                        inds = abs(dsdy(i, :)) < abs(dsdythresh);
+                        splateau = mean(snow(i,inds));
+                        sthresh  = 0.98*splateau + 0.02*max(abs(snow(i,:)));
+
                         j=1;
-                        while (snow(i,j) > sthresh || dsdy(i,j) < dsdythresh) && j<size(snow,2)
+                        while ((snow(i,j) > sthresh) ...% && snow(i,j) > snow(i, j+1)) ...
+                                || dsdy(i,j) < dsdythresh) ...
+                                && j<size(snow,2)
                             j = j+1;
                         end
                         value(i) = min(j+1,size(snow,2));
@@ -269,6 +285,7 @@ classdef aveSlice < kCut
                         %value(i) = min(size(temp,2), indnow+1);
                     end
                 case "sInteg"
+                    u = obj.oGridProp('U');
                     del99 = obj.delta99("sInteg");
                     for i=1:length(del99)
                         ynow = obj.yBL(i,:);
@@ -283,10 +300,25 @@ classdef aveSlice < kCut
                         [~, value(i)] = min(abs(del99(i) - ynow));
                         %value(i) = min(size(temp,2), indnow+1);
                     end
+
+                case "integralCorrelation"
+                    mode = obj.blEdgeMode;
+                    obj.blEdgeMode = "sCombined";
+                    
+                    U = obj.U;
+                    del = obj.delta99;
+                    inds = obj.thickness2ind(del);
+                    for i=1:length(del)
+                        Uenow = 0.99*U(i, inds(i));
+                        [~, value(i)] = min(abs(U(i,1:inds(i)) - Uenow));
+                    end
+                    obj.blEdgeMode = mode;
+
             end
             if obj.iSmoothBL
                 value = round(obj.smooth_dist(value));
             end
+            obj.blEdgeStore = value;
             
         end
 
@@ -389,6 +421,11 @@ classdef aveSlice < kCut
                     end
                 case "sCombined"
                     inds = obj.BLedgeInd("sCombined");
+                    for i=1:size(obj.yBL,1)
+                        value(i) = obj.yBL(i,inds(i));
+                    end
+                case "integralCorrelation"
+                    inds = obj.BLedgeInd("integralCorrelation");
                     for i=1:size(obj.yBL,1)
                         value(i) = obj.yBL(i,inds(i));
                     end
@@ -531,7 +568,7 @@ classdef aveSlice < kCut
                 Uprof = Unow(i,1:inds(i));
                 ro0 = ronow(i,inds(i));
                 U0 = Unow(i,inds(i));
-                integrand = (roprof.*Uprop)/(ro0*U0);
+                integrand = (roprof.*Uprof)/(ro0*U0);
                 ys = obj.yBL(i,1:inds(i));
                 num(i) = trapz(ys, integrand);
             end
@@ -607,6 +644,70 @@ classdef aveSlice < kCut
             disp('')
         end
 
+        function value = thickness2ind(obj, del)
+            y = obj.yO;
+
+            if length(del) ~= size(y, 1)
+                value = [];
+                fprintf("Length of thickness vactor must equal lenghth of O grid\n");
+            else
+                for i=1:size(y,1)
+                    [~, value(i)] = min(abs(y(i,:) - del(i)));
+                end
+            end
+
+        end
+
+        function value = edge_prop(obj, prop, varargin)
+
+            p = inputParser;
+
+            addParameter(p, 'thickness', 'delta99');
+
+            parse(p, varargin{:});
+
+            del = p.Results.thickness;
+
+            if ischar(del)
+                del = obj.(del);
+            end
+
+            inds = obj.thickness2ind(del);
+            q = obj.oGridProp(prop);
+            for i=1:length(inds)
+                value(i) = q(i, inds(i));
+            end
+        end
+
+        function plt = plot_along_edge(obj, prop, varargin)
+
+            x0 = min(obj.xSurf);
+            x1 = max(obj.xSurf);
+
+            defaultLineWidth = 1.5;
+            defaultFmtString = '';
+            defaultXRange = [x0 x1];
+
+            p = inputParser;
+
+            addParameter(p, 'ax', gca);
+            addParameter(p, 'xrange', defaultXRange);
+            addParameter(p, 'fmt', defaultFmtString);
+            addParameter(p, 'LineWidth', defaultLineWidth);
+            addParameter(p, 'ColorOrderIndex',[]);
+            addParameter(p, 'thickness', 'delta99');
+
+            parse(p, varargin{:});
+
+            x = obj.xSurf;
+            q = obj.edge_prop(prop, 'thickness', p.Results.thickness);
+            i1 = obj.x2ind(p.Results.xrange(1));
+            i2 = obj.x2ind(p.Results.xrange(2));
+
+            plt = plot(p.Results.ax, x(i1:i2), q(i1:i2), p.Results.fmt, 'LineWidth',p.Results.LineWidth);
+
+        end
+
         function plt = plot_BL_edge(obj, varargin)
 
             x0 = min(obj.xSurf);
@@ -620,8 +721,6 @@ classdef aveSlice < kCut
 
             addParameter(p, 'ax', gca);
             addParameter(p, 'xrange', defaultXRange);
-            addParameter(p, 'loopxrange', []);
-            addParameter(p, 'ploteq', false);
             addParameter(p, 'fmt', defaultFmtString);
             addParameter(p, 'LineWidth', defaultLineWidth);
             addParameter(p, 'ColorOrderIndex',[]);
@@ -630,7 +729,12 @@ classdef aveSlice < kCut
             parse(p, varargin{:});
 
             x = obj.xSurf;
-            edge = obj.(p.Results.thickness);
+            if ischar(p.Results.thickness)
+                edge = obj.(p.Results.thickness);
+            else
+                edge = p.Results.thickness;
+            end
+
             i1 = obj.x2ind(p.Results.xrange(1));
             i2 = obj.x2ind(p.Results.xrange(2));
 
@@ -1050,6 +1154,23 @@ classdef aveSlice < kCut
             value = obj.smooth_dist(value);
         end
 
+        function value = get.cd_inner(obj)
+            inds = obj.BLedgeInd;
+            muSij2 = obj.oGridProp('muSij2');
+            Unow = obj.U;
+            for i=1:size(obj.yBL,1)
+                prof = muSij2(i,1:inds(i));
+                Ue = Unow(i,inds(i));
+                ys = obj.yBL(i,1:inds(i));
+                value(i) = trapz(ys, prof)/(Ue^3);
+            end
+            value = obj.smooth_dist(value);
+        end
+
+        function value = get.cd(obj)
+            value = obj.cd_inner + obj.blPr;
+        end
+
         function value = get.blPr_eq(obj)
             Hk = obj.H_k;
             value = 0.02456*((Hk-1)./Hk).^3;
@@ -1072,10 +1193,7 @@ classdef aveSlice < kCut
 
         function value = get.Ue(obj)
             inds = obj.BLedgeInd;
-            Unow = obj.U;
-            % Misen = obj.Msurf;
-            % Tisen = obj.T0in./(1+((obj.gas.gam-1)/2)*Misen.^2);
-            % value = Misen.*sqrt(obj.gas.cp*(obj.gas.gam-1)*Tisen);                                               
+            Unow = obj.U;                                              
             for i=1:length(inds)
                 value(i) = Unow(i,inds(i));
             end
@@ -1133,6 +1251,7 @@ classdef aveSlice < kCut
             for i = 1:length(inds)
                 value(i) = obj.yBL(i,inds(i));
             end
+            value = obj.smooth_dist(value);
         end
 
         function value = j_ctau_max(obj)
@@ -1383,96 +1502,151 @@ classdef aveSlice < kCut
             value = obj.get_mut_ratio;
         end
 
-        function sol = MISES_BL(obj, xstart, K, varargin)
+        function sol = MISES_BL(obj, xstart, varargin)
 
             data = [];
             istart = obj.x2ind(xstart);
             xsurf = obj.xSurf;
             is = istart:length(xsurf);
             xsurf = xsurf(is);
-            Me = obj.Msurf(is);
-            Ue = obj.Ue(is);
             nue = obj.nu_e(is);
 
-            if nargin > 2 && ~isempty(K)
-                data.Kcorr = K.Kcorr;
-                data.Kd = K.Kd;
-                data.Kp = K.Kp;
+            Kdefault = struct('Kcorr', 4.2, 'Kd', 0, 'Kp', 0);
+
+            p = inputParser;
+            addParameter(p, 'K', Kdefault);
+            addParameter(p, 'Me', []);
+            addParameter(p, 'Ue', []);
+            addParameter(p, 'DNSinputs',[]);
+
+            parse(p, varargin{:});
+
+            Me = p.Results.Me;
+            Ue = p.Results.Ue;
+            
+            data.Kcorr = p.Results.K.Kcorr;
+            data.Kd = p.Results.K.Kd;
+            data.Kp = p.Results.K.Kp;
+
+            v = string(p.Results.DNSinputs);
+
+            if isempty(Me)
+                Me = obj.Msurf(is);
+            else
+                Me = Me(is);
             end
 
-    
-            v = string(varargin);
+            if isempty(Ue)
+                Ue = obj.Ue(is);
+            else
+                Ue = Ue(is);
+            end
+
             if ismember("theta", v) || ismember("thick", v)
                 data.theta = obj.theta(is);
+                theta0 = data.theta(1);
+            else
+                theta0 = obj.x2prop(xstart, 'theta');
             end
+
+            Reth0 = Ue(1)*theta0/nue(1);
+
             if ismember("delStar", v) || ismember("thick", v)
                 data.delStar = obj.delStar(is);
+                delStar0 = data.delStat(1);
+            else
+                delStar0 = obj.x2prop(xstart, 'delStar');
             end
+
             if ismember("H", v) || ismember("SFs", v)
                 data.H = obj.H(is);
             end
+            H0 = delStar0/theta0;
+
             if ismember("Hk", v) || ismember("SFs", v)
                 data.Hk = obj.H_k(is);
+                Hk0 = data.Hk(1);
+            else
+                Hk0 = MISES_correlations.fHk(Me(1), H0);
             end
+
+            Hks0 = MISES_correlations.fHks(Hk0, Reth0);
+
             if ismember("H_ke", v) || ismember("SFs", v)
                 data.Hs = obj.H_ke(is);
+                Hs0 = data.Hs(1);
+            else
+                Hs0 = MISES_correlations.fHs(Me(1), Hks0);
             end
+            
             if ismember("cf", v)
                 data.cf = obj.cf(is);
             end
 
+
             fun = @(x, y) MISES_ydash(x, y, xsurf, Me, Ue, nue, data);
 
             Pr0 = obj.x2prop(xstart, 'blPr');
-            Us0 = MISES_correlations.fUs(obj.x2prop(xstart, 'H_ke'), ...
-                obj.x2prop(xstart, 'H_k'), ...
-                obj.x2prop(xstart, 'H'));
+            Us0 = MISES_correlations.fUs(Hs0, Hk0, H0);
 
-
-            y0 = [obj.x2prop(xstart, 'theta'); ...
-                obj.x2prop(xstart, 'delStar'); ...
+            y0 = [theta0; ...
+                Hs0; ...
                 Pr0/(1-Us0)];
 
             step = xsurf(2)-xsurf(1);
             opts = odeset('InitialStep',step, 'MaxStep', 2*step, 'Stats','on');
             sol = ode78(fun, xsurf, y0, opts);
 
+            sol.Me = interp1(xsurf, Me, sol.x);
+            sol.Ue = interp1(xsurf, Ue, sol.x);
+            sol.nue = interp1(xsurf, nue, sol.x);
+
             if ismember("theta", v) || ismember("thick", v)
-                    sol.theta = interp1(xsurf, data.theta, sol.x);
+                sol.theta = interp1(xsurf, data.theta, sol.x);
             else
                 sol.theta = sol.y(1,:);
+            end
+
+            sol.Reth = sol.theta.*sol.Ue./sol.nue;
+
+            if ismember("Hs", v) || ismember("SFs", v)
+                sol.Hs = interp1(xsurf, data.Hs, sol.x);
+            else
+                sol.Hs = sol.y(2,:);
+            end
+
+            sol.Hks = MISES_correlations.fHks_Hs(sol.Hs, sol.Me);
+
+            if ismember("Hk", v) || ismember("SFs", v)
+                sol.H_k = interp1(xsurf, data.Hk, sol.x);
+            else
+                sol.H_k = MISES_correlations.fHk_Hks(sol.Hks, sol.Reth);
+            end
+
+            if ismember("H", v)
+                sol.H = interp1(xsurf, data.H, sol.x);
+            else
+                sol.H = MISES_correlations.fH(sol.Me, sol.H_k);
+                % sol.H = sol.delStar/sol.theta;
             end
 
             if ismember("delStar", v) || ismember("thick", v)
                 sol.delStar = interp1(xsurf, data.delStar, sol.x);
             else
-                sol.delStar = sol.y(2,:);
-            end
-
-            sol.ctau = sol.y(3,:);
-
-            sol.H = sol.delStar./sol.theta;
-            sol.Me = interp1(xsurf, Me, sol.x);
-            sol.Ue = interp1(xsurf, Ue, sol.x);
-            sol.nue = interp1(xsurf, nue, sol.x);
-            sol.Reth = sol.theta.*sol.Ue./sol.nue;
-            
-            
-            if ismember("Hk", v) || ismember("SFs", v)
-                sol.H_k = interp1(xsurf, data.Hk, sol.x);
-            else
-                sol.H_k = MISES_correlations.fHk(sol.Me, sol.H);
+                sol.delStar = sol.H.*sol.theta;
             end
 
             sol.H_ks = MISES_correlations.fHks(sol.H_k, sol.Reth);
+            
 
             if ismember("H_ke", v) || ismember("SFs", v)
                 sol.H_ke = interp1(xsurf, data.Hs, sol.x);
             else
-                sol.H_ke = MISES_correlations.fHs(sol.Me, sol.H_ks);
+                sol.H_ke = sol.Hs; %MISES_correlations.fHs(sol.Me, sol.H_ks);
             end
 
             sol.Hss = MISES_correlations.fHss(sol.Me, sol.H_k);
+            sol.ctau = sol.y(3,:);
 
             if ismember("cf", v)
                 sol.cf = interp1(xsurf, data.cf, sol.x);
@@ -1482,9 +1656,10 @@ classdef aveSlice < kCut
 
             sol.Us = MISES_correlations.fUs(sol.H_ke, sol.H_k, sol.H);
             sol.cd = MISES_correlations.fCd(sol.cf, sol.Us, sol.ctau);
-            sol.CtEQ = MISES_correlations.fCtEQ(sol.H_ke, sol.Us, sol.H, sol.H_k);
+            sol.CtauEq = MISES_correlations.fCtEQ(sol.H_ke, sol.Us, sol.H, sol.H_k);
             sol.del = MISES_correlations.fDel(sol.theta, sol.H_k, sol.delStar);
             sol.Pr = sol.ctau.*(1-sol.Us);
+            sol.PrEq = sol.CtauEq.*(1-sol.Us);
 
         end        
     end

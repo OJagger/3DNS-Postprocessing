@@ -116,13 +116,14 @@ classdef DNS_channel < DNS_case
                 clear propnow
             end
 
-            for i=1:ib
+            for i=1:newCase.NB
                 flow = volFlowBlock();
+                flow.ib = i;
                 for ip = 1:length(props)
-                    fprintf('Reading %s, block %d\n',[props{ip}, ib])
+                    fprintf('Reading %s, block %d\n',props{ip}, i)
                     prop = props{ip};
-                    data = load(fullfile(newCase.casepath,sprintf('block_%d_%s.mat',[i, prop])));
-                    flow.(prop) = data;
+                    block = load(fullfile(newCase.casepath,sprintf('block_%d_%s.mat',[i, prop])));
+                    flow.(prop) = block.data;
                     clear data
                 end
 
@@ -164,9 +165,15 @@ classdef DNS_channel < DNS_case
                 row = [];
                 for i=1:obj.nbi
                     ib = i+(j-1)*obj.nbi;
-                    row = [row prop{ib}];
+                    row = [row; prop{ib}];
+                    if i < obj.nbi
+                        row = row(1:end-1,:,:);
+                    end
                 end
-                arr = [arr; row];
+                arr = [arr row];
+                if j < obj.nbj
+                    arr = arr(:,1:end-1,:);
+                end
             end
         end
 

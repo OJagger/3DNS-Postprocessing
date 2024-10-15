@@ -14,8 +14,8 @@ classdef DNS_case < handle
         solver;
         bcs;
         gas;
-        x;
-        y;
+        % x;
+        % y;
         nSlices;
         nProbes;
         nSkip;
@@ -46,10 +46,11 @@ classdef DNS_case < handle
         pitch;
     end
 
-    properties (Dependent = true)
+    properties (Dependent = true, Hidden=true)
         ftrip;
         Re_k;        % Trip Reynolds number
         trip_Re_x;
+        aspect_ratio;
     end
 
     methods
@@ -111,6 +112,7 @@ classdef DNS_case < handle
                 obj.blk.corner = rcase.corner;
                 obj.bcs = rcase.bcs;
                 obj.gas = rcase.gas;
+                obj.gas.rgas = obj.gas.cp * (obj.gas.gam - 1)/obj.gas.gam;
                 obj.solver = rcase.solver;
                 obj.blk.inlet_blocks{1} = rcase.inlet_blocks;
                 obj.blk.z = linspace(0, obj.solver.span, obj.blk.nk);
@@ -478,7 +480,7 @@ classdef DNS_case < handle
 
         function readInstFlow(obj)
             %READINSTFLOW Read in instantaneous 3D flow
-            obj.instFlow = volFlow(obj.runpath,obj.blk,obj.gas,obj.bcs,obj.casetype,obj.if_rans);
+            obj.instFlow = volFlow(obj.blk,obj.gas,obj.bcs,obj.runpath,obj.casetype,obj.if_rans);
             
         end
 
@@ -656,7 +658,12 @@ classdef DNS_case < handle
             blkData.x = obj.blk.x{blkData.nb}(blkData.i,blkData.j);
             blkData.y = obj.blk.y{blkData.nb}(blkData.i,blkData.j);
             obj.probes{end+1} = dnsProbe([], obj.nProbes+1, obj.nSkip, blkData, obj.gas);
-            obj.nProbes = obj.nProbes + 1;
+            
+            if isempty(obj.nProbes)
+                obj.nProbes = 1;
+            else
+                obj.nProbes = obj.nProbes + 1;
+            end
         end
 
         function addProbes(obj, newProbes)
@@ -669,7 +676,11 @@ classdef DNS_case < handle
                 blkData.y = obj.blk.y{blkData.nb}(blkData.i,blkData.j);
                 obj.probes{end+1} = dnsProbe([], obj.nProbes+1, obj.nSkip, blkData, obj.gas);
             end
-            obj.nProbes = obj.nProbes + length(newProbes);
+            if isempty(obj.nProbes)
+                obj.nProbes = length(newProbes);
+            else
+                obj.nProbes = obj.nProbes + length(newProbes);
+            end
         end
 
         function removeProbes(obj, rmProbes)
@@ -815,7 +826,9 @@ classdef DNS_case < handle
                     caxis([-val val]);
                     colormap(redblue)
                 elseif string(prop) == "M" && string(p.Results.ColorMap) == "redblue"
-                    caxis([0 2])
+                    if isempty(lims)
+                        lims = [0 2];
+                    end
                     colormap(redblue)
                 end
             end
@@ -1001,6 +1014,7 @@ classdef DNS_case < handle
             label = p.Results.label;
             repeats = p.Results.nrepeats;
             ax = p.Results.ax;
+            colormap = p.Results.ColorMap;
 
             axes(ax)
             f = gcf;
@@ -1013,7 +1027,7 @@ classdef DNS_case < handle
 
             switch class(slices(1))
                 case 'kSlice'
-                    f.UserData.plotfcn = @(slice, area) obj.kPlot(slice,prop,'ax',ax,'lims',lims,'label',label, 'viewarea', area, 'nrepeats', repeats);
+                    f.UserData.plotfcn = @(slice, area) obj.kPlot(slice,prop,'ax',ax,'lims',lims,'label',label, 'viewarea', area, 'nrepeats', repeats, 'ColorMap', colormap);
                 case 'jSlice'
                     f.UserData.plotfcn = @(slice, area) obj.jPlot(slice,prop,ax,lims,label);
             end
@@ -1088,7 +1102,7 @@ classdef DNS_case < handle
                 q = slice.(prop);
             end
             hold on
-            for i=1:slice.NB
+            for i=1:obj.NB
                 a = smoothdata(q{i},1);
                 a = smoothdata(a,2);
                 [~,s] = contour(p.Results.ax, obj.blk.x{i}, obj.blk.y{i}, a, levels, fmt, 'LineWidth', linew);
@@ -2015,6 +2029,35 @@ classdef DNS_case < handle
 
         end
 
+        function value = get.aspect_ratio(obj)
+
+            for i=1:obj.NB
+                x = obj.blk.x{i};
+                y = obj.blk.y{i};
+                x = x(:,:,1);
+                y = y(:,:,1);
+            
+                dxi = x(2:end,:)-x(1:end-1,:);
+                dxi(end+1,:) = dxi(end,:);
+                dxj = x(:,2:end)-x(:,1:end-1);
+                dxj(:,end+1) = dxj(:,end);
+                
+                dyi = y(2:end,:)-y(1:end-1,:);
+                dyi(end+1,:) = dyi(end,:);
+                dyj = y(:,2:end)-y(:,1:end-1);
+                dyj(:,end+1) = dyj(:,end);
+                
+                dsi = sqrt(dxi.^2+dyi.^2);
+                dsj = sqrt(dxj.^2+dyj.^2);
+            
+                % min_spacing(i) = min(min(dsi, dsj),[],'all');
+                
+                value{i} = max(dsi./dsj, dsj./dsi);
+                % value{i}(end+1,:) = value{i}(end,:);
+                % value{i}(:,end+1) = value{i}(:,end);
+            end
+        end
+
         function writeInputFiles(obj)
             write_input_files(obj.casepath,obj.blk, ...
                 obj.bcs,obj.gas,obj.solver,'topology',obj.topology,'casetype',obj.casetype);
@@ -2393,7 +2436,29 @@ classdef DNS_case < handle
         
         end
 
-        function [i,j] = find_ij(obj, nb, x, y)
+        function nb = find_block(obj, x, y)
+            nb = [];
+            for ib=1:obj.NB
+                xb = [obj.blk.x{ib}(1:end-1,1); ...
+                    obj.blk.x{ib}(end,1:end-1)'; ...
+                    obj.blk.x{ib}(end:-1:2,end); ...
+                    obj.blk.x{ib}(1,end:-1:2)'];
+
+                yb = [obj.blk.y{ib}(1:end-1,1); ...
+                    obj.blk.y{ib}(end,1:end-1)'; ...
+                    obj.blk.y{ib}(end:-1:2,end); ...
+                    obj.blk.y{ib}(1,end:-1:2)'];
+
+                if inpolygon(x,y,xb,yb)
+                    nb = ib;
+                    break
+                end
+            end
+
+        end
+
+        function [i,j,nb] = find_ij(obj, x, y)
+            nb = obj.find_block(x,y);
             xnow = obj.blk.x{nb};
             ynow = obj.blk.y{nb};
             ds = sqrt((xnow-x).^2 + (ynow-y).^2);
@@ -2405,12 +2470,13 @@ classdef DNS_case < handle
             oldProbes = oldCase.probes;
             newProbes = {};
             for ip = 1:oldCase.nProbes
-                [i,j] = obj.find_ij(oldProbes{ip}.nb,oldProbes{ip}.x,oldProbes{ip}.y);
-                blkData.i = i; blkData.j = j;
+                [i,j,nb] = obj.find_ij(oldProbes{ip}.x,oldProbes{ip}.y);
+                blkData.i = i;
+                blkData.j = j;
+                blkData.nb = nb;
                 blkData.k = ceil(obj.solver.nk/2);
                 blkData.x = obj.blk.x{oldProbes{ip}.nb}(i,j);
                 blkData.y = obj.blk.y{oldProbes{ip}.nb}(i,j);
-                blkData.nb = oldProbes{ip}.nb;
                 newProbes{ip} = dnsProbe([],ip,obj.nSkip,blkData,obj.gas);
             end
         end
@@ -2791,7 +2857,7 @@ classdef DNS_case < handle
                         slice = slices(i);
                     end
 
-                    if strcmp(prop,'overlay')
+                    if strcmp(prop,'')%overlay')
                         slice2schlierenVortOverlay(slice, obj.blk, fullfile(imgfolder,sprintf('img_%03d.png',slice.nSlice)), lims, area, aspect);
                     else
                         switch class(slice)

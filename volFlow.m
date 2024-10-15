@@ -45,7 +45,14 @@ classdef volFlow < handle
     end
 
     methods
-        function obj = volFlow(casedir, blk, gas, bcs, casetype, if_rans)
+        function obj = volFlow(blk, gas, bcs, casedir, casetype, if_rans)
+
+            obj.ro = {};
+            obj.u = {};
+            obj.v = {};
+            obj.w = {};
+            obj.Et = {};
+            obj.mut = {};
 
             if nargin > 0
                 blockdims = blk.blockdims;
@@ -56,103 +63,98 @@ classdef volFlow < handle
                 obj.gam = gas.gam;
                 obj.cp = gas.cp;
                 obj.rgas = obj.cp*(1-1/obj.gam);
-                obj.casetype = casetype;
-                obj.if_rans = if_rans;
-    
                 obj.NB = size(blockdims,1);
-                for nb = 1:obj.NB
+                if nargin > 3
+                    obj.casetype = casetype;
+                    obj.if_rans = if_rans;
+        
+                    for nb = 1:obj.NB
+        
+                        fprintf('Reading block %d/%d\n',[nb, obj.NB])
     
-                    fprintf('Reading block %d/%d\n',[nb, obj.NB])
-
-                    ro = zeros(blockdims(nb,1),blockdims(nb,2),blockdims(nb,3));
-                    ru = zeros(blockdims(nb,1),blockdims(nb,2),blockdims(nb,3));
-                    rv = zeros(blockdims(nb,1),blockdims(nb,2),blockdims(nb,3));
-                    rw = zeros(blockdims(nb,1),blockdims(nb,2),blockdims(nb,3));
-                    Et = zeros(blockdims(nb,1),blockdims(nb,2),blockdims(nb,3));
-                    tau_xx = zeros(blockdims(nb,1),blockdims(nb,2),blockdims(nb,3));
-                    tau_yy = zeros(blockdims(nb,1),blockdims(nb,2),blockdims(nb,3));
-                    tau_zz = zeros(blockdims(nb,1),blockdims(nb,2),blockdims(nb,3));
-                    tau_xy = zeros(blockdims(nb,1),blockdims(nb,2),blockdims(nb,3));
-                    tau_xz = zeros(blockdims(nb,1),blockdims(nb,2),blockdims(nb,3));
-                    tau_yz = zeros(blockdims(nb,1),blockdims(nb,2),blockdims(nb,3));
-
-                    switch casetype
-                        case 'cpu'
-                            if exist(fullfile(casedir, 'inst_flo'), 'dir')
-                                flopath = fullfile(casedir, 'inst_flo', ['flo2_' num2str(nb)]);
-                                flofile = fopen(flopath,'r');
-                                nodfile = fopen(fullfile(casedir, 'inst_flo', ['nod2_' num2str(nb)]),'r');
-                            else
-                                flopath = fullfile(casedir,  ['flo2_' num2str(nb)]);
-                                flofile = fopen(flopath,'r');
-                                nodfile = fopen(fullfile(casedir, ['nod2_' num2str(nb)]),'r');
-                            end
-                            %viscpath = fullfile(casedir,  ['visc_' num2str(nb)]);
-                            %viscfile = fopen(viscpath,'r');
-        
-                            A = fread(flofile,inf,'float64');
-                            A = reshape(A,5,length(A)/5);
-                            
-                            B = fread(nodfile,inf,'uint32');
-                            B = reshape(B,3,length(B)/3);
-        
-        %                     C = fread(viscfile,inf,'float64');
-        %                     C = reshape(C,13,length(C)/13 );
-        
-                    
-                            fclose(flofile);
-                            fclose(nodfile);
+                        ro = zeros(blockdims(nb,1),blockdims(nb,2),blockdims(nb,3));
+                        ru = zeros(blockdims(nb,1),blockdims(nb,2),blockdims(nb,3));
+                        rv = zeros(blockdims(nb,1),blockdims(nb,2),blockdims(nb,3));
+                        rw = zeros(blockdims(nb,1),blockdims(nb,2),blockdims(nb,3));
+                        Et = zeros(blockdims(nb,1),blockdims(nb,2),blockdims(nb,3));
+                        tau_xx = zeros(blockdims(nb,1),blockdims(nb,2),blockdims(nb,3));
+                        tau_yy = zeros(blockdims(nb,1),blockdims(nb,2),blockdims(nb,3));
+                        tau_zz = zeros(blockdims(nb,1),blockdims(nb,2),blockdims(nb,3));
+                        tau_xy = zeros(blockdims(nb,1),blockdims(nb,2),blockdims(nb,3));
+                        tau_xz = zeros(blockdims(nb,1),blockdims(nb,2),blockdims(nb,3));
+                        tau_yz = zeros(blockdims(nb,1),blockdims(nb,2),blockdims(nb,3));
+    
+                        switch casetype
+                            case 'cpu'
+                                if exist(fullfile(casedir, 'inst_flo'), 'dir')
+                                    flopath = fullfile(casedir, 'inst_flo', ['flo2_' num2str(nb)]);
+                                    flofile = fopen(flopath,'r');
+                                    nodfile = fopen(fullfile(casedir, 'inst_flo', ['nod2_' num2str(nb)]),'r');
+                                else
+                                    flopath = fullfile(casedir,  ['flo2_' num2str(nb)]);
+                                    flofile = fopen(flopath,'r');
+                                    nodfile = fopen(fullfile(casedir, ['nod2_' num2str(nb)]),'r');
+                                end
+                                %viscpath = fullfile(casedir,  ['visc_' num2str(nb)]);
+                                %viscfile = fopen(viscpath,'r');
             
-                            for n=1:size(A,2)
-                                i = B(1,n);
-                                j = B(2,n);
-                                k = B(3,n);
-                                ro(i,j,k) = A(1,n);
-                                ru(i,j,k) = A(2,n);
-                                rv(i,j,k) = A(3,n);
-                                rw(i,j,k) = A(4,n);
-                                Et(i,j,k) = A(5,n);
-                                mut = [];
-                            end
-                        case 'gpu'
-                            ni = blk.blockdims(nb,1);
-                            nj = blk.blockdims(nb,2);
-                            nk = blk.blockdims(nb,3);
-                            fid = fopen(fullfile(casedir, ['flow_' num2str(nb)]));
-                            A = fread(fid, ni*nj*nk*5, 'float64');
-                            A = reshape(A, 5, length(A)/5)';
-                            fclose(fid);
-
-                            ro = reshape(A(:,1),ni,nj,nk);
-                            ru = reshape(A(:,2),ni,nj,nk);
-                            rv = reshape(A(:,3),ni,nj,nk);
-                            rw = reshape(A(:,4),ni,nj,nk);
-                            Et = reshape(A(:,5),ni,nj,nk);
-
-                            if if_rans
-                                fid = fopen(fullfile(casedir, ['rans_' num2str(nb)]));
-                                A = fread(fid, ni*nj*nk, 'float64');
-                                mut = reshape(A(:),ni,nj,nk);
+                                A = fread(flofile,inf,'float64');
+                                A = reshape(A,5,length(A)/5);
+                                
+                                B = fread(nodfile,inf,'uint32');
+                                B = reshape(B,3,length(B)/3);
+            
+            %                     C = fread(viscfile,inf,'float64');
+            %                     C = reshape(C,13,length(C)/13 );
+            
+                        
+                                fclose(flofile);
+                                fclose(nodfile);
+                
+                                for n=1:size(A,2)
+                                    i = B(1,n);
+                                    j = B(2,n);
+                                    k = B(3,n);
+                                    ro(i,j,k) = A(1,n);
+                                    ru(i,j,k) = A(2,n);
+                                    rv(i,j,k) = A(3,n);
+                                    rw(i,j,k) = A(4,n);
+                                    Et(i,j,k) = A(5,n);
+                                    mut = [];
+                                end
+                            case 'gpu'
+                                ni = blk.blockdims(nb,1);
+                                nj = blk.blockdims(nb,2);
+                                nk = blk.blockdims(nb,3);
+                                fid = fopen(fullfile(casedir, ['flow_' num2str(nb)]));
+                                A = fread(fid, ni*nj*nk*5, 'float64');
+                                A = reshape(A, 5, length(A)/5)';
                                 fclose(fid);
-                            else
-                                mut = [];
-                            end
-                    end
     
-                    obj.ro{nb} = ro;
-                    obj.u{nb} = ru./ro;
-                    obj.v{nb} = rv./ro;
-                    obj.w{nb} = rw./ro;
-                    obj.Et{nb} = Et;
-                    obj.mut{nb} = mut;
+                                ro = reshape(A(:,1),ni,nj,nk);
+                                ru = reshape(A(:,2),ni,nj,nk);
+                                rv = reshape(A(:,3),ni,nj,nk);
+                                rw = reshape(A(:,4),ni,nj,nk);
+                                Et = reshape(A(:,5),ni,nj,nk);
+    
+                                if if_rans
+                                    fid = fopen(fullfile(casedir, ['rans_' num2str(nb)]));
+                                    A = fread(fid, ni*nj*nk, 'float64');
+                                    mut = reshape(A(:),ni,nj,nk);
+                                    fclose(fid);
+                                else
+                                    mut = [];
+                                end
+                        end
+        
+                        obj.ro{nb} = ro;
+                        obj.u{nb} = ru./ro;
+                        obj.v{nb} = rv./ro;
+                        obj.w{nb} = rw./ro;
+                        obj.Et{nb} = Et;
+                        obj.mut{nb} = mut;
+                    end
                 end
-            else
-                obj.ro = {};
-                obj.u = {};
-                obj.v = {};
-                obj.w = {};
-                obj.Et = {};
-                obj.mut = {};
             end
         end
 
@@ -369,8 +371,8 @@ classdef volFlow < handle
 
         function interpOntoNewGrid(obj, newcase)
 
-            newFlow = volFlow();
-            ronow = {};
+            newFlow = volFlow(newcase.blk, newcase.gas, newcase.bcs);
+            newFlow.casetype = newcase.casetype;
 
 
             for ib = 1:obj.NB
@@ -384,15 +386,36 @@ classdef volFlow < handle
                 [Jc,Ic,Kc] = meshgrid(fjc,fic,fkc);
                 [J,I,K] = meshgrid(fj,fi,fk);
 
-                ronow{ib} = interp3(Jc,Ic,Kc,obj.ro{ib},J,I,K);
-                unow{ib} = interp3(Jc,Ic,Kc,obj.u{ib},J,I,K);
-                vnow{ib} = interp3(Jc,Ic,Kc,obj.v{ib},J,I,K);
-                wnow{ib} = interp3(Jc,Ic,Kc,obj.w{ib},J,I,K);
-                Etnow{ib} = interp3(Jc,Ic,Kc,obj.Et{ib},J,I,K);
+                if obj.blk.nk == 1
+
+                    fprintf('interpolting ro\n')
+                    ronow{ib} = interp2(Jc,Ic,obj.ro{ib},J,I);
+                    fprintf('interpolting u\n')
+                    unow{ib} = interp2(Jc,Ic,obj.u{ib},J,I);
+                    fprintf('interpolting v\n')
+                    vnow{ib} = interp2(Jc,Ic,obj.v{ib},J,I);
+                    fprintf('interpolting w\n')
+                    wnow{ib} = interp2(Jc,Ic,obj.w{ib},J,I);
+                    fprintf('interpolting Et\n')
+                    Etnow{ib} = interp2(Jc,Ic,obj.Et{ib},J,I);
+
+                else
+
+                    fprintf('interpolting ro\n')
+                    ronow{ib} = interp3(Jc,Ic,Kc,obj.ro{ib},J,I,K);
+                    fprintf('interpolting u\n')
+                    unow{ib} = interp3(Jc,Ic,Kc,obj.u{ib},J,I,K);
+                    fprintf('interpolting v\n')
+                    vnow{ib} = interp3(Jc,Ic,Kc,obj.v{ib},J,I,K);
+                    fprintf('interpolting w\n')
+                    wnow{ib} = interp3(Jc,Ic,Kc,obj.w{ib},J,I,K);
+                    fprintf('interpolting Et\n')
+                    Etnow{ib} = interp3(Jc,Ic,Kc,obj.Et{ib},J,I,K);
+                end
                 
             end
 
-            newFlow = obj;
+            % newFlow = obj;
             newFlow.ro = ronow;
             newFlow.u = unow;
             newFlow.v = vnow;
@@ -404,15 +427,19 @@ classdef volFlow < handle
         end
 
 
-        function writeFlowBlock(obj, path, nb, type)
+        function writeFlowBlock(obj, path, nb)
             
+            if nargin < 4
+                type = obj.casetype;
+            end
+
             ronow = obj.ro{nb};
             runow = ronow.*obj.u{nb};
             rvnow = ronow.*obj.v{nb};
             rwnow = ronow.*obj.w{nb};
             Etnow = obj.Et{nb};
 
-            switch obj.casetype
+            switch type
                 case 'cpu'
                     fpos = 0;
                     for i=1:size(obj.ro{nb},1)

@@ -70,6 +70,7 @@ function newcase = setup_channel_case(name, path, blk, Min, theta, varargin)
     end
 
     newcase = DNS_channel;
+    newcase.NB = size(blk.blockdims, 1);
     newcase.casename = name;
     newcase.blk = blk;
     newcase.gas = gas;

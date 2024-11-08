@@ -30,7 +30,10 @@ classdef inletProfile < handle
         jEdge;
         delStar;
         theta;
+        delStar_k;
+        theta_k;
         H;
+        H_k;
     end
         
     methods
@@ -139,6 +142,19 @@ classdef inletProfile < handle
 
         end
 
+        function value = get.theta_k(obj)
+            
+            ye = 1.1*obj.del995;
+            [~, jLim] = min(abs(obj.y - ye));
+
+            Uprof = obj.u(1:jLim);
+            [Ue, je] = max(Uprof);
+
+            integrand = (Uprof/Ue).*(1-Uprof/Ue);
+            value = trapz(obj.y(1:jLim), integrand);
+
+        end
+
         function value = get.delStar(obj)
             
             ye = 1.1*obj.del995;
@@ -154,8 +170,25 @@ classdef inletProfile < handle
 
         end
 
+        function value = get.delStar_k(obj)
+            
+            ye = 1.1*obj.del995;
+            [~, jLim] = min(abs(obj.y - ye));
+
+            Uprof = obj.u(1:jLim);
+            [Ue, je] = max(Uprof);
+
+            integrand = 1 - Uprof/Ue;
+            value = trapz(obj.y(1:jLim), integrand);
+
+        end
+
         function value = get.H(obj)
             value = obj.delStar/obj.theta;
+        end
+
+        function value = get.H_k(obj)
+            value = obj.delStar_k/obj.theta_k;
         end
             
 

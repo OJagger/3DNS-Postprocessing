@@ -66,25 +66,28 @@ classdef MISES_correlations
             end
         end
         
-        function Ret = fRet(Me, theta, T0, P0)
-            cp = 1005;
-            gam = 1.4;
-            R = cp*(gam-1)/gam;
-            ro0 = P0/(R*T0);
-            T = T0./(1+0.5*(gam-1)*Me.^2);
-            ro = ro0./(1+0.5*(gam-1)*Me.^2).^(1/(gam-1));
-            Ue = Me.*sqrt(gam*R*T);
-            mu_ref = 5.83247e-004;
-            Tref = 273;
-            mu_s = 10.4;
-            mue = mu_ref*(T/Tref)^(1.5)*(Tref+mu_s)/(T + mu_s);
-            Ret = ro*Ue*theta/mue;
-            if ~isreal(Ret)
-                error('Ret complex')
-            end
-        end
+        % function Ret = fRet(Me, theta, T0, P0)
+        %     cp = 1005;
+        %     gam = 1.4;
+        %     R = cp*(gam-1)/gam;
+        %     ro0 = P0/(R*T0);
+        %     T = T0./(1+0.5*(gam-1)*Me.^2);
+        %     ro = ro0./(1+0.5*(gam-1)*Me.^2).^(1/(gam-1));
+        %     Ue = Me.*sqrt(gam*R*T);
+        %     mu_ref = 5.83247e-004;
+        %     Tref = 273;
+        %     mu_s = 10.4;      % Use mu_s from input file!!
+        %     mue = mu_ref*(T/Tref)^(1.5)*(Tref+mu_s)/(T + mu_s);
+        %     Ret = ro*Ue*theta/mue;
+        %     if ~isreal(Ret)
+        %         error('Ret complex')
+        %     end
+        % end
         
         function Cf = fCf(Hk, Ret, Me)
+            Hk = reshape(Hk, [], 1);
+            Ret = reshape(Ret, [], 1);
+            Me = reshape(Me, [], 1);
             Fc = sqrt(1+0.2*Me.^2);
             Cf = (0.3*exp(-1.33*Hk).*(log10(Ret./Fc)).^(-1.74-0.31.*Hk) ...
                 + 0.00011*(tanh(4-Hk/0.875) - 1))./Fc;
@@ -122,6 +125,9 @@ classdef MISES_correlations
         end
         
         function Cd = fCd(Cf, Us, Ct)
+            Cf = reshape(Cf, [], 1);
+            Us = reshape(Us, [], 1);
+            Ct = reshape(Ct, [], 1);
             Cd = 0.5*Cf.*Us + Ct.*(1-Us);
             if ~isreal(Cd)
                 error('Cd complex')

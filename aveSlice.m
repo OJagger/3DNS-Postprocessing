@@ -30,6 +30,7 @@ classdef aveSlice < kCut
         H_ke;           % K.E. shape factor = thetaStar/theta
         H_rho;          % Density shape factor H** = delta**/theta
         H1;             
+        Us;             % Slip velocity
         %delta99;       % BL thickness
         %delta99_unsflo;
         delta;          % Approx BL thickness
@@ -46,6 +47,7 @@ classdef aveSlice < kCut
         blPr;           % Componant of cd due to production of tke
         blPr_eq;        % Coles' equilibrium prodution
         cd_inner;       % Componant of cd dow to mean strain
+        cd_mean_strain;
         cd;             % Dissipation coefficient
         tau_w;          % Wall shear stress
         u_tau;          % Friction velocity
@@ -573,6 +575,10 @@ classdef aveSlice < kCut
                 num(i) = trapz(ys, integrand);
             end
             value = num(i)./obj.theta;
+        end
+
+        function value = get.Us(obj)
+            value = MISES_correlations.fUs(obj.H_ke, obj.H_k, obj.H);
         end
 
         function value = get.delta(obj)
@@ -1156,11 +1162,28 @@ classdef aveSlice < kCut
 
         function value = get.cd_inner(obj)
             inds = obj.BLedgeInd;
-            muSij2 = obj.oGridProp('muSij2');
+            nuSij2 = obj.oGridProp('muSij2');
             Unow = obj.U;
+            ronow = obj.oGridProp('ro');
             for i=1:size(obj.yBL,1)
-                prof = muSij2(i,1:inds(i));
+                prof = nuSij2(i,1:inds(i));
                 Ue = Unow(i,inds(i));
+                roe = ronow(i, inds(i));
+                ys = obj.yBL(i,1:inds(i));
+                value(i) = trapz(ys, prof)/(Ue^3);
+            end
+            value = obj.smooth_dist(value);
+        end
+
+        function value = get.cd_mean_strain(obj)
+            inds = obj.BLedgeInd;
+            diss_ave = obj.oGridProp('diss_ave');
+            Unow = obj.U;
+            ronow = obj.oGridProp('ro');
+            for i=1:size(obj.yBL,1)
+                prof = diss_ave(i,1:inds(i));
+                Ue = Unow(i,inds(i));
+                roe = ronow(i, inds(i));
                 ys = obj.yBL(i,1:inds(i));
                 value(i) = trapz(ys, prof)/(Ue^3);
             end
@@ -1168,7 +1191,7 @@ classdef aveSlice < kCut
         end
 
         function value = get.cd(obj)
-            value = obj.cd_inner + obj.blPr;
+            value = obj.cd_mean_strain + obj.blPr;
         end
 
         function value = get.blPr_eq(obj)
@@ -1500,6 +1523,49 @@ classdef aveSlice < kCut
 
         function value = get.mut_ratio(obj)
             value = obj.get_mut_ratio;
+        end
+
+        function sol = run_mrchbl(obj, xstart, path, xtrip)
+
+            Kcorr = 5.6;
+            Kp = 1.0;
+            Kd  = 1.0;
+            
+            ni = 401;
+            M = obj.x2prop(xstart, 'Msurf');
+            rt = obj.x2prop(xstart, 'Re_theta');
+            ds = obj.x2prop(xstart, 'delStar');
+            th = obj.x2prop(xstart, 'theta');
+            istart = obj.x2ind(xstart);
+            a0 = sqrt(obj.gas.gam*obj.gas.rgas*obj.bcs.Toin);
+            Ue = obj.Ue(istart:end)/a0;
+            x = obj.xSurf(istart:end);
+            xnow = linspace(x(1), x(end), ni);
+            Ue = interp1(x, Ue, xnow);
+            if nargin < 4 || isempty(xtrip)
+                xtrip = 0.5*(x(1)+x(2));
+            end
+            if xnow(1) == 0
+                xnow(1) = 0.1*xnow(2);
+            end
+
+
+            H = ds/th;
+            Hk = MISES_correlations.fHk(M, H);
+            Hks = MISES_correlations.fHks(Hk, rt);
+            Hs = MISES_correlations.fHs(M, Hks);
+            Pr = obj.x2prop(xstart, 'blPr');
+
+            Us = MISES_correlations.fUs(Hs, Hk, H);
+            ct = Pr/(1-Us);
+
+            input_file = fullfile(path, 'inp.dat');
+            output_file = fullfile(path, 'out.dat');
+            write_mrchbl_input(input_file, xnow, Ue, M, rt, xtrip, th, ds, ct, Kcorr, Kp, Kd);
+            mrchbl_path = '~/MISES/MISES_old/bin/mblrun';
+            system([mrchbl_path ' ' input_file ' ' output_file]);
+            sol = read_mrchbl_output(output_file);
+            
         end
 
         function sol = MISES_BL(obj, xstart, varargin)

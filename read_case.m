@@ -311,7 +311,7 @@ function rcase = read_case(casename, type, run)
             bcs.gamma = temp(6);
             bcs.aturb = temp(7);
             bcs.nturb = temp(8);
-            bcs.iradprof = temp(9);
+            bcs.radprof = temp(9);
             bcs.g_z = temp(10);
         
             % Gas props

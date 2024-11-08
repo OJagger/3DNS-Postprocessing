@@ -48,6 +48,17 @@ if ismember(casetype, {'gpu', 'all'})
     % GPU input
     fidin = fopen(fullfile(path,'input_gpu.txt'),'w');
     fprintf(fidin,'%d %d\n', [NB,1]);
+
+    if ~isfield(bcs, 'nturb')
+        bcs.nturb = bcs.ilength;
+    end
+    if ~isfield(bcs, 'radprof')
+        bcs.radprof = 0;
+    end
+    if ~isfield(bcs, 'theta')
+        bcs.theta = 0;
+    end
+
        
     nprocs = 0;
     
@@ -126,6 +137,11 @@ if ismember(casetype, {'gpu', 'all'})
     end
     
     end
+
+    if ~isfield(blk, 'nbg')
+        blk.nbg = 1;
+        blk.block_groups{1} = 1:NB;
+    end
     
     fprintf(fidin,'%d',blk.nbg); % 1 block group
     for nbg = 1:blk.nbg
@@ -147,7 +163,7 @@ if ismember(casetype, {'gpu', 'all'})
         fprintf(fidin,'%f %f\n', [solver.cfl solver.sigma]);
         
          % Toin poin pext vref alpha_in pitch_in aturb (not used) ilength (not used) g_z
-        fprintf(fidin,'%f %f %f %f %f %f %f %d %d %f\n', [bcs.Toin bcs.Poin bcs.pexit bcs.vin bcs.alpha bcs.gamma bcs.aturb bcs.nturb bcs.iradprof bcs.g_z]);
+        fprintf(fidin,'%f %f %f %f %f %f %f %d %d %f\n', [bcs.Toin bcs.Poin bcs.pexit bcs.vin bcs.alpha bcs.gamma bcs.aturb bcs.nturb bcs.radprof bcs.g_z]);
         
         % gamma cp mu_ref sutherlands constants prandtl no.
         fprintf(fidin,'%f %f %12.5e %f %f %f\n', [gas.gamma gas.cp gas.mu_ref gas.mu_tref gas.mu_cref gas.pr]);
@@ -159,7 +175,7 @@ if ismember(casetype, {'gpu', 'all'})
         fprintf(fidin,'%d %d\n', [solver.irestart solver.istats]);
 
         % inlet BL, theta
-        fprintf(fidin,'%d %d\n', [solver.ilam bcs.theta]);
+        fprintf(fidin,'%d %4.2e\n', [solver.ilam bcs.theta]);
     
     fclose(fidin);
 end

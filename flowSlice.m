@@ -49,7 +49,9 @@ classdef flowSlice < handle
         wallDist;       % Distance from wall
         flowAng;
         muSij2;         % Dissipation due to mean strain
+        nuSij2;
         duidxj;         % Velocity gradient tensor
+        diss_ave;
     end
 
     methods
@@ -395,6 +397,51 @@ classdef flowSlice < handle
 
         end
 
+        function value = get.nuSij2(obj)
+
+            for ib = 1:obj.NB
+
+                [DUDX,DUDY] = gradHO(obj.blk.x{ib},obj.blk.y{ib},obj.u{ib});
+                [DVDX,DVDY] = gradHO(obj.blk.x{ib},obj.blk.y{ib},obj.v{ib});
+
+                % Strain tensor
+                S = zeros(obj.blk.blockdims(ib,1),obj.blk.blockdims(ib,2),3,3);
+                
+                S(:,:,1,1) = DUDX;
+                S(:,:,2,2) = DVDY;
+
+                S(:,:,1,2) = 0.5*(DUDY+DVDX);
+                S(:,:,2,1) = S(:,:,1,2);
+
+                value{ib} = obj.nu{ib}.*sum(sum(S.*S,4),3);
+            end
+
+
+        end
+
+        function diss_av = get.diss_ave(obj)
+
+            for ib = 1:obj.NB
+
+                [dudx, dudy] = gradHO(obj.blk.x{ib}, obj.blk.y{ib}, obj.u{ib});
+                [dvdx, dvdy] = gradHO(obj.blk.x{ib}, obj.blk.y{ib}, obj.v{ib});
+                [dwdx, dwdy] = gradHO(obj.blk.x{ib}, obj.blk.y{ib}, obj.w{ib});
+
+                nu = obj.nu{ib};
+
+
+                s11 = dudx;
+                s22 = dvdy;
+                s33 = 0;
+                s12 = (dudy + dvdx)*0.5;
+                s23 = 0.5*dwdy;
+                s13 = 0.5*dwdx;
+                % dissipation due to time mean strain
+                diss_av{ib} = (nu.*(2*(s11.*s11 + s22.*s22 + s33.*s33) + 4*s23.*s23 + 4*s13.*s13 + 4*s12.*s12 ) ...
+                            - (2/3)*nu.*(s11 + s22 + s33).*(s11 + s22 + s33) );
+            end
+
+        end
         function value = get.local_cfl(obj)
             cfl = 1.0;
             Vnow = obj.vel;

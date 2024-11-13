@@ -234,14 +234,14 @@ classdef meanSlice < aveSlice
                             
                         end
     
-                        u = ru./ro;
-                        v = rv./ro;
-                        w = rw./ro;
+                        Uf = ru./ro;
+                        Vf = rv./ro;
+                        Wf = rw./ro;
     
                         obj.ro{nb} = ro;
-                        obj.u{nb} = u;
-                        obj.v{nb} = v;
-                        obj.w{nb} = w;
+                        obj.u{nb} = Uf;
+                        obj.v{nb} = Vf;
+                        obj.w{nb} = Wf;
                         obj.Et{nb} = Et;
                         obj.pbar{nb} = (Et - 0.5*(rou2 + rov2 + row2))*(obj.gas.gam-1);
                         obj.Tbar{nb} = (obj.pbar{nb}.*obj.gas.gam)./(obj.gas.cp*(obj.gas.gam-1)*obj.ro{nb});
@@ -253,25 +253,26 @@ classdef meanSlice < aveSlice
                         [DUDX,DUDY] = gradHO(blk.x{nb},blk.y{nb},obj.u{nb});
                         [DVDX,DVDY] = gradHO(blk.x{nb},blk.y{nb},obj.v{nb});
     
-                        UdUd = rou2./ro - u.*u;
-                        VdVd = rov2./ro - v.*v;
-                        WdWd = row2./ro - w.*w;
+                        UddUdd = rou2./ro - Uf.*Uf;
+                        VddVdd = rov2./ro - Vf.*Vf;
+                        WddWdd = row2./ro - Wf.*Wf;
     
-                        UdVd = rouv./ro - u.*v;
-                        UdWd = rouw./ro - u.*w;
-                        VdWd = rovw./ro - v.*w;
+                        UddVdd = rouv./ro - Uf.*Vf;
+                        UddWdd = rouw./ro - Uf.*Wf;
+                        VddWdd = rovw./ro - Vf.*Wf;
     
-                        obj.roUddUdd{nb} = rou2 - ro.*u.*u;
-                        obj.roVddVdd{nb} = rov2 - ro.*v.*v;
-                        obj.roWddWdd{nb} = row2 - ro.*w.*w;
+                        obj.roUddUdd{nb} = rou2 - ro.*Uf.*Uf;
+                        obj.roVddVdd{nb} = rov2 - ro.*Vf.*Vf;
+                        obj.roWddWdd{nb} = row2 - ro.*Wf.*Wf;
     
-                        obj.roUddVdd{nb} = rouv - ro.*u.*v;
-                        obj.roUddWdd{nb} = rouw - ro.*u.*w;
-                        obj.roVddWdd{nb} = rovw - ro.*v.*w;
+                        obj.roUddVdd{nb} = rouv - ro.*Uf.*Vf;
+                        obj.roUddWdd{nb} = rouw - ro.*Uf.*Wf;
+                        obj.roVddWdd{nb} = rovw - ro.*Vf.*Wf;
     
-                        obj.Pr{nb} = -ro.*(UdUd.*DUDX + UdVd.*(DUDY+DVDX) + VdVd.*DVDY);
+                        obj.Pr{nb} = -ro.*(UddUdd.*DUDX + UddVdd.*(DUDY+DVDX) + VddVdd.*DVDY);
+                        % obj.Pr{nb} = -obj.roUdd
                         obj.diss{nb} = diss;
-                        obj.k{nb} = 0.5*(UdUd + VdVd + WdWd); 
+                        obj.k{nb} = 0.5*(UddUdd + VddVdd + WddWdd); 
     
                         if nstats > 17
                             obj.rev_gen_x{nb} = qx_T;

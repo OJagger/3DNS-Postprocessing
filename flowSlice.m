@@ -427,7 +427,7 @@ classdef flowSlice < handle
                 [dvdx, dvdy] = gradHO(obj.blk.x{ib}, obj.blk.y{ib}, obj.v{ib});
                 [dwdx, dwdy] = gradHO(obj.blk.x{ib}, obj.blk.y{ib}, obj.w{ib});
 
-                nu = obj.nu{ib};
+                mu = obj.mu{ib};
 
 
                 s11 = dudx;
@@ -437,8 +437,8 @@ classdef flowSlice < handle
                 s23 = 0.5*dwdy;
                 s13 = 0.5*dwdx;
                 % dissipation due to time mean strain
-                diss_av{ib} = (nu.*(2*(s11.*s11 + s22.*s22 + s33.*s33) + 4*s23.*s23 + 4*s13.*s13 + 4*s12.*s12 ) ...
-                            - (2/3)*nu.*(s11 + s22 + s33).*(s11 + s22 + s33) );
+                diss_av{ib} = (mu.*(2*(s11.*s11 + s22.*s22 + s33.*s33) + 4*s23.*s23 + 4*s13.*s13 + 4*s12.*s12 ) ...
+                            - (2/3)*mu.*(s11 + s22 + s33).*(s11 + s22 + s33) );
             end
 
         end

@@ -3137,6 +3137,10 @@ classdef DNS_case < handle
                 v{ib} = zeros(ni, nj);
                 w{ib} = zeros(ni, nj);
 
+                uu{ib} = zeros(ni,nj);
+                vv{ib} = zeros(ni,nj);
+                ww{ib} = zeros(ni,nj);
+
                 ro2{ib} = zeros(ni,nj);
                 rou2{ib} = zeros(ni,nj);
                 rov2{ib} = zeros(ni,nj);
@@ -3163,9 +3167,14 @@ classdef DNS_case < handle
             end
             
             [paths2read, slicenums2read, time2read, ishere] = obj.getSlicePaths(obj.run);
-            [~, inds] = ismember(slicenums2read, sliceNums);
-            inds = inds(inds>0);
-            nSlices = length(inds);
+            if nargin > 1 && ~isempty(sliceNums)
+                [~, inds] = ismember(slicenums2read, sliceNums);
+                inds = inds(inds>0);
+                nSlices = length(inds);
+            else
+                nSlices = length(slicenums2read);
+                inds = 1:nSlices;
+            end
 
             for i = 1:nSlices
 
@@ -3180,6 +3189,14 @@ classdef DNS_case < handle
                     rv{ib} = rv{ib} + slice.ro{ib} .* slice.v{ib} / nSlices;
                     rw{ib} = rw{ib} + slice.ro{ib} .* slice.w{ib} / nSlices;
                     Et{ib} = Et{ib} + slice.Et{ib} / nSlices;
+
+                    u{ib} = u{ib} + slice.u{ib} / nSlices;
+                    v{ib} = v{ib} + slice.v{ib} / nSlices;
+                    w{ib} = w{ib} + slice.w{ib} / nSlices;
+
+                    uu{ib} = uu{ib} + slice.u{ib}.^2 / nSlices;
+                    vv{ib} = vv{ib} + slice.v{ib}.^2 / nSlices;
+                    ww{ib} = ww{ib} + slice.w{ib}.^2 / nSlices;
 
                     ro2{ib} = ro2{ib} + slice.ro{ib}.^2 / nSlices;
                     rou2{ib} = rou2{ib} + slice.ro{ib} .* slice.u{ib}.^2 / nSlices;
@@ -3198,9 +3215,9 @@ classdef DNS_case < handle
             end
             
             for ib = 1:obj.NB
-                u{ib} = ru{ib} ./ ro{ib};
-                v{ib} = rv{ib} ./ ro{ib};
-                w{ib} = rw{ib} ./ ro{ib};
+                % u{ib} = u{ib} ./ ro{ib};
+                % v{ib} = v{ib} ./ ro{ib};
+                % w{ib} = w{ib} ./ ro{ib};
                 pbar{ib} = (Et{ib} - 0.5*(rou2{ib} + rov2{ib} + row2{ib}))*(obj.gas.gam-1);
                 Tbar{ib} = (pbar{ib}.*obj.gas.gam)./(obj.gas.cp*(obj.gas.gam-1)*ro{ib});
 
@@ -3208,13 +3225,13 @@ classdef DNS_case < handle
                 [DUDX,DUDY] = gradHO(obj.blk.x{ib},obj.blk.y{ib},u{ib});
                 [DVDX,DVDY] = gradHO(obj.blk.x{ib},obj.blk.y{ib},v{ib});
 
-                UdUd = rou2{ib}./ro{ib} - u{ib}.*u{ib};
-                VdVd = rov2{ib}./ro{ib} - v{ib}.*v{ib};
-                WdWd = row2{ib}./ro{ib} - w{ib}.*w{ib};
+                % UdUd = rou2{ib}./ro{ib} - u{ib}.*u{ib};
+                % VdVd = rov2{ib}./ro{ib} - v{ib}.*v{ib};
+                % WdWd = row2{ib}./ro{ib} - w{ib}.*w{ib};
 
-                UdVd = rouv{ib}./ro{ib} - u{ib}.*v{ib};
-                UdWd = rouw{ib}./ro{ib} - u{ib}.*w{ib};
-                VdWd = rovw{ib}./ro{ib} - v{ib}.*w{ib};
+                % UdVd = rouv{ib}./ro{ib} - u{ib}.*v{ib};
+                % UdWd = rouw{ib}./ro{ib} - u{ib}.*w{ib};
+                % VdWd = rovw{ib}./ro{ib} - v{ib}.*w{ib};
 
                 roUddUdd{ib} = rou2{ib} - ro{ib}.*u{ib}.*u{ib};
                 roVddVdd{ib} = rov2{ib} - ro{ib}.*v{ib}.*v{ib};
@@ -3224,8 +3241,25 @@ classdef DNS_case < handle
                 roUddWdd{ib} = rouw{ib} - ro{ib}.*u{ib}.*w{ib};
                 roVddWdd{ib} = rovw{ib} - ro{ib}.*v{ib}.*w{ib};
 
-                Pr{ib} = -ro{ib}.*(UdUd.*DUDX + UdVd.*(DUDY+DVDX) + VdVd.*DVDY);
-                k{ib} = 0.5*(UdUd + VdVd + WdWd);
+                % Pr{ib} = -ro{ib}.*(UdUd.*DUDX + UdVd.*(DUDY+DVDX) + VdVd.*DVDY);
+                % k{ib} = 0.5*(UdUd + VdVd + WdWd);
+
+                UdUd{ib} = uu{ib} - u{ib}.*u{ib};
+                VdVd{ib} = vv{ib} - v{ib}.*v{ib};
+                WdWd{ib} = ww{ib} - w{ib}.*w{ib};
+
+                RdUd{ib} = ru{ib} - ro{ib}.*u{ib};
+                RdVd{ib} = rv{ib} - ro{ib}.*v{ib};
+                RdWd{ib} = rw{ib} - ro{ib}.*w{ib};
+
+                RUdUd{ib} = rou2{ib} - ro{ib}.*u{ib}.*u{ib} - 2*u{ib}.*RdUd{ib};
+                RVdVd{ib} = rov2{ib} - ro{ib}.*v{ib}.*v{ib} - 2*v{ib}.*RdVd{ib};
+                
+                RUdVd{ib} = rouv{ib} - ro{ib}.*u{ib}.*v{ib} - u{ib}.*RdVd{ib} - v{ib}.*RdUd{ib};
+
+                Pr{ib} = -1 * (RUdUd{ib}.*DUDX + RUdVd{ib}.*(DUDY+DVDX) + RVdVd{ib}.*DVDY);
+                k{ib} = 0.5 * (UdUd{ib} + VdVd{ib} + WdWd{ib});
+
             end
 
 

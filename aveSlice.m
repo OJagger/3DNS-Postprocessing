@@ -1162,11 +1162,11 @@ classdef aveSlice < kCut
 
         function value = get.cd_inner(obj)
             inds = obj.BLedgeInd;
-            nuSij2 = obj.oGridProp('muSij2');
+            muSij2 = obj.oGridProp('nuSij2');
             Unow = obj.U;
             ronow = obj.oGridProp('ro');
             for i=1:size(obj.yBL,1)
-                prof = nuSij2(i,1:inds(i));
+                prof = muSij2(i,1:inds(i));
                 Ue = Unow(i,inds(i));
                 roe = ronow(i, inds(i));
                 ys = obj.yBL(i,1:inds(i));
@@ -1185,7 +1185,7 @@ classdef aveSlice < kCut
                 Ue = Unow(i,inds(i));
                 roe = ronow(i, inds(i));
                 ys = obj.yBL(i,1:inds(i));
-                value(i) = trapz(ys, prof)/(Ue^3);
+                value(i) = trapz(ys, prof)/(roe*Ue^3);
             end
             value = obj.smooth_dist(value);
         end
@@ -1527,7 +1527,7 @@ classdef aveSlice < kCut
 
         function sol = run_mrchbl(obj, xstart, path, xtrip)
 
-            Kcorr = 5.6;
+            Kcorr = 2.8;
             Kp = 1.0;
             Kd  = 1.0;
             
@@ -1562,7 +1562,7 @@ classdef aveSlice < kCut
             input_file = fullfile(path, 'inp.dat');
             output_file = fullfile(path, 'out.dat');
             write_mrchbl_input(input_file, xnow, Ue, M, rt, xtrip, th, ds, ct, Kcorr, Kp, Kd);
-            mrchbl_path = '~/MISES/MISES_old/bin/mblrun';
+            mrchbl_path = '~/MISES/MISES/bin/mblrun';
             system([mrchbl_path ' ' input_file ' ' output_file]);
             sol = read_mrchbl_output(output_file);
             

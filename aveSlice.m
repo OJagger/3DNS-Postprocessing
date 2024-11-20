@@ -1527,7 +1527,7 @@ classdef aveSlice < kCut
 
         function sol = run_mrchbl(obj, xstart, path, xtrip)
 
-            Kcorr = 2.8;
+            Kcorr = 11.2;
             Kp = 1.0;
             Kd  = 1.0;
             

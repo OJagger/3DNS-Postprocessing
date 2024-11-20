@@ -190,7 +190,7 @@ classdef meanSlice < aveSlice
     
                             case 'gpu'
                                 nstats_prim = 12;
-                                nstats_budg = 10;
+                                nstats_budg = nstats-nstats_prim;
                                 flopath = fullfile(basedir,  ['mean2_' num2str(nb) '_' num2str(obj.nMean)]);
                                 flofile = fopen(flopath,'r');
                                 fullfile(basedir, ['mnod2_' num2str(nb) '_' num2str(obj.nMean)]);

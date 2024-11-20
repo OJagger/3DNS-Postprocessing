@@ -172,8 +172,8 @@ elseif NB == 9
     oblocks = [3 5 7 4];
     oblocks_flip = [0, 0, 1, 1];
 else
-    oblocks = 1:legnth(blk.x);
-    oblocks_flip(1:legnth(blk.x)) = 0;
+    oblocks = 1:length(blk.x);
+    oblocks_flip(1:langth(blk.x)) = 0;
 end
     
 for i=1:length(oblocks)

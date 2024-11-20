@@ -851,6 +851,38 @@ classdef DNS_channel < DNS_case
 
         end
 
+        function prof = sample_inlet_profile(obj, s, xs)
+
+            prof = obj.inletProf;
+            
+
+            i= s.x2ind(xs);
+            inds = s.BLedgeInd;
+            j = inds(i);
+            prof.y = s.yBL(i,:);
+
+            Uprof = s.BLprof(xs, 'U');
+            alpha = atan(s.BLprof(xs, 'v')./Uprof);
+            po = s.BLprof(xs, 'p0');
+            To = s.BLprof(xs, 'T0');
+
+            Uprof(1:j) = Uprof(1:j)/Uprof(j);
+            po(1:j) = po(1:j)/po(j);
+            To(1:j) = To(1:j)/To(j);
+
+            Uprof(j+1:end) = 1;
+            po(j+1:end) = 1;
+            To(j+1:end) = 1;
+            alpha(j+1:end) = alpha(j);
+
+            prof.vel_prof = Uprof;
+            prof.po_prof = po;
+            prof.To_prof = To;
+            prof.alpha = alpha;
+            prof.alpha(isnan(prof.alpha)) = 0;
+
+        end
+
         function plotYWall(obj)
 
             dy = [];

@@ -249,7 +249,21 @@ classdef inletProfile < handle
 
         end
 
-        function interpolateOntoNewCase(obj, newcase)
+        function prof = scale_thickness(obj, thetanow)
+
+            prof = obj;
+            prof.casepath = [];
+
+            scale = obj.theta/thetanow;
+
+            prof.vel_prof = interp1(obj.y/scale, obj.vel_prof, obj.y, 'pchip', 'extrap');
+            prof.po_prof = interp1(obj.y/scale, obj.po_prof, obj.y, 'pchip', 'extrap');
+            prof.To_prof = interp1(obj.y/scale, obj.To_prof, obj.y, 'pchip', 'extrap');
+            prof.alpha = interp1(obj.y/scale, obj.alpha, obj.y, 'pchip', 'extrap');
+
+        end
+
+        function newprof = interpolateOntoNewCase(obj, newcase)
             
             newprof = inletProfile(newcase.blk, newcase.gas, newcase.bcs);
             newprof.y = newcase.blk.y{newcase.blk.inlet_blocks{1}}(1,:);
@@ -258,12 +272,12 @@ classdef inletProfile < handle
             newprof.urf = obj.urf;
             newprof.nj = length(newprof.y);
 
-            newprof.vel_prof = interp1(obj.y, obj.vel_prof, newprof.y);
-            newprof.po_prof = interp1(obj.y, obj.po_prof, newprof.y);
-            newprof.To_prof = interp1(obj.y, obj.To_prof, newprof.y);
-            newprof.alpha = interp1(obj.y, obj.alpha, newprof.y);
+            newprof.vel_prof = interp1(obj.y, obj.vel_prof, newprof.y, 'pchip', 'extrap');
+            newprof.po_prof = interp1(obj.y, obj.po_prof, newprof.y, 'pchip', 'extrap');
+            newprof.To_prof = interp1(obj.y, obj.To_prof, newprof.y, 'pchip', 'extrap');
+            newprof.alpha = interp1(obj.y, obj.alpha, newprof.y, 'pchip', 'extrap');
 
-            newcase.inletProf = newprof;
+            % newcase.inletProf = newprof;
 
         end
 

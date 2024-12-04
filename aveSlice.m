@@ -9,6 +9,7 @@ classdef aveSlice < kCut
         muinf;
         Tinf;
         T0in;
+        pin;
         dsdyThresh;% = -50;
         use_unsflo = false;
         blEdgeMode;
@@ -54,6 +55,7 @@ classdef aveSlice < kCut
         dUdy;
         dTdy;
         cf;
+        ct;             % ctau based on Pr/(1-Us);
         ctau;
         ctau_max;
         Re_theta;
@@ -66,10 +68,12 @@ classdef aveSlice < kCut
         alpha2;
         p0out;
         yplus;
+        wall_scale;     % Coordinade for wall distance = 1;
         mut;            % Turbulent viscosity
         mut_ratio;
         RT;             % Hydra stupe turbulent Re
 %         wallDist;
+        Yp;
     end
 
     methods
@@ -100,6 +104,7 @@ classdef aveSlice < kCut
             muinf = [];
             roinf = [];
             Tinf = [];
+            pinf = [];
             for i=1:length(inlet_blocks)
                 nj = obj.blk.blockdims(inlet_blocks(i),2);
                 js = 1:nj;
@@ -120,10 +125,12 @@ classdef aveSlice < kCut
                 Uinf = [Uinf Unow{inlet_blocks(i)}(is,js)];
                 muinf = [muinf munow{inlet_blocks(i)}(is,js)];
                 roinf = [roinf ronow{inlet_blocks(i)}(is,js)];
+                pinf = [pinf pnow{inlet_blocks(i)}(is,js)];
             end
             obj.p0in = mean(p0,'all');
             obj.Tinf = mean(Tinf, 'all');
             obj.Uinf = mean(Uinf,'all');
+            obj.pin = mean(pinf, 'all');
             obj.muinf = mean(muinf,'all');
             obj.roinf = mean(roinf,'all');
             obj.T0in = obj.Tinf+obj.Uinf^2/(2*obj.gas.cp);
@@ -444,22 +451,26 @@ classdef aveSlice < kCut
             nnow = obj.n;
             value = zeros(size(obj.yBL));
             for i=1:size(obj.yBL,1)
-                tang = [-nnow(2,i); nnow(1,i)];
+                tang = [nnow(2,i); -nnow(1,i)];
                 for j=1:size(obj.yBL,2)
                     velnow = [unow(i,j); vnow(i,j)];
                     % value(i,j) = -dot(tang, velnow - nnow(:,i)*dot(nnow(:,i),velnow));
-                    value(i,j) = norm(velnow - dot(velnow,nnow(:,i)));
+                    value(i,j) = dot(velnow - dot(velnow,nnow(:,i)), tang);
                 end
             end
         end
 
         function value = get.delStar(obj)
-            inds = obj.BLedgeInd(obj.blEdgeMode);
+            inds = obj.BLedgeInd;
             ronow = obj.oGridProp('ro');
             Unow = obj.U;
             value = zeros(1,length(inds));
             for i=1:size(obj.yBL,1)
-                integrand = 1 - ronow(i,1:inds(i)).*Unow(i,1:inds(i))./(ronow(i,inds(i))*Unow(i,inds(i)));
+                roprof = ronow(i,1:inds(i));
+                Uprof = Unow(i,1:inds(i));
+                ro0 = ronow(i,inds(i));
+                U0 = Unow(i,inds(i));
+                integrand = 1 - ((roprof.*Uprof)./(ro0*U0));
                 ys = obj.yBL(i,1:inds(i));
                 value(i) = trapz(ys, integrand);
             end
@@ -589,7 +600,27 @@ classdef aveSlice < kCut
             value = obj.ssurf*obj.Uinf*obj.roinf/obj.muinf;
         end
 
+        function value = obj.dUedx_eq(obj)
 
+            A = 6.7;
+            B = 0.75;
+
+            Hnow = obj.H;
+            Hknow = obj.Hk;
+            thetanow = obj.theta;
+
+            value = (1/(B*Hnow.*thetanow))*(0.5*obj.cf - ((Hknow-1)/(A*Hk))^2);
+        end
+
+        function value = ctau_eq(obj)
+
+            A = 6.7;
+            B = 0.75;
+            Hknow = obj.H_k;
+            
+            value = (0.5/(A*A*B))*obj.H_ke.*(Hknow-1).^3./(obj.H.*Hknow.^2);
+
+        end
 
         function plt = blDevPlot(obj, prop, varargin) % ax, lims, xrange, fmt)
 
@@ -679,6 +710,7 @@ classdef aveSlice < kCut
             end
 
             inds = obj.thickness2ind(del);
+            value = zeros(length(inds),1);
             q = obj.oGridProp(prop);
             for i=1:length(inds)
                 value(i) = q(i, inds(i));
@@ -1260,7 +1292,12 @@ classdef aveSlice < kCut
             Prnow = obj.oGridProp('Pr');
             dUdynow = obj.dUdy;
             tau = Prnow./dUdynow;
-            value = tau./(roe'.*Uenow.^2);
+            % value = tau./(roe'.*Uenow.^2);
+            value = tau./(ronow.*Uenow.^2);
+        end
+
+        function value = get.ct(obj)
+            value = obj.blPr./(1-obj.Us);
         end
 
         function value = get.ctau_max(obj)
@@ -1311,6 +1348,12 @@ classdef aveSlice < kCut
 
             value = sqrt(obj.tau_w./ro_w);
 
+        end
+
+        function value = get.wall_scale(obj)
+            nunow = obj.oGridProp('nu');
+            nunow = nunow(:,2);
+            value = nunow./obj.u_tau;
         end
 
         function [xplus,yplus,zplus] = wall_coords_offset(obj)
@@ -1525,35 +1568,92 @@ classdef aveSlice < kCut
             value = obj.get_mut_ratio;
         end
 
-        function sol = run_mrchbl(obj, xstart, path, xtrip)
+        function value = get.Yp(obj)
+            p0now = obj.p0;
+            
+            for ib=1:obj.NB
+                value{ib} = (obj.p0in - p0now{ib})/(obj.p0in - obj.pin);
+            end
 
-            Kcorr = 11.2;
+        end
+
+        function value = bl_history(obj, xrange)
+
+            if nargin < 2 || isempty(xrange)
+                xrange = [obj.xSurf(1) obj.xSurf(end)];
+            end
+
+            is = obj.x2ind(xrange(1)):obj.x2ind(xrange(2));
+
+            props = ["H", "H_k", "H_ke", "H_rho", "delStar", "theta",...
+                "Re_theta", "cf", "cd", "ctau_max", "Ue", "Us", ...
+                "ct", "blPr", "xSurf", "Msurf", "ctau", "wall_scale", ...
+                "yBL"];
+
+            for i=1:length(props)
+                value.(props(i)) = obj.(props(i))(is);
+            end
+            value.x = value.xSurf;
+            value.Pr = value.blPr;
+            value.Pk = obj.oGridProp('Pr');
+            value.roe = obj.edge_prop('ro');
+
+        end
+
+        function terms = shear_lag_terms(obj)
+
+            
+
+        end
+
+        function sol = run_mrchbl(obj, xstart, path, xtrip, xmatch)
+
+            Kcorr = 5.6;
             Kp = 1.0;
             Kd  = 1.0;
+
+            if nargin < 5
+                xmatch = [];
+            end
             
             ni = 401;
-            M = obj.x2prop(xstart, 'Msurf');
-            rt = obj.x2prop(xstart, 'Re_theta');
-            ds = obj.x2prop(xstart, 'delStar');
-            th = obj.x2prop(xstart, 'theta');
+            Min = obj.x2prop(xstart, 'Msurf');
             istart = obj.x2ind(xstart);
-            a0 = sqrt(obj.gas.gam*obj.gas.rgas*obj.bcs.Toin);
-            Ue = obj.Ue(istart:end)/a0;
-            x = obj.xSurf(istart:end);
-            xnow = linspace(x(1), x(end), ni);
-            Ue = interp1(x, Ue, xnow);
-            if nargin < 4 || isempty(xtrip)
-                xtrip = 0.5*(x(1)+x(2));
-            end
-            if xnow(1) == 0
-                xnow(1) = 0.1*xnow(2);
-            end
 
+            rt_dns = obj.Re_theta(istart:end);
+            ds_dns = obj.delStar(istart:end);
+            th_dns = obj.theta(istart:end);
+
+            rt = rt_dns(1);
+            ds = ds_dns(1);
+            th = th_dns(1);
+
+            % ds = obj.x2prop(xstart, 'delStar');
+            % th = obj.x2prop(xstart, 'theta');
+            a0 = sqrt(obj.gas.gam*obj.gas.rgas*obj.bcs.Toin);
+            % Ue = obj.Ue(istart:end)/a0;
+            x = obj.xSurf(istart:end);
+            xc = linspace(x(1), x(end), ni);
+            xnow = linspace(x(1), x(end), floor(ni/4)+1);
+            Msurf = obj.Msurf(istart:end);
+            Mc = interp1(x, Msurf, xnow);
+            M = interp1(xnow, Mc, xc, 'pchip');
+            % Uc = interp1(x, Ue, xnow);
+            % Ue = interp1(xnow, Uc, xc, 'pchip');
+
+            Ue = V_MT0(M, obj.bcs.Toin)/a0;
+            
+            if nargin < 4 || isempty(xtrip)
+                xtrip = 0.5*(xc(1)+xc(2));
+            end
+            if xc(1) == 0
+                xc(1) = 0.1*xc(2);
+            end
 
             H = ds/th;
-            Hk = MISES_correlations.fHk(M, H);
+            Hk = MISES_correlations.fHk(Min, H);
             Hks = MISES_correlations.fHks(Hk, rt);
-            Hs = MISES_correlations.fHs(M, Hks);
+            Hs = MISES_correlations.fHs(Min, Hks);
             Pr = obj.x2prop(xstart, 'blPr');
 
             Us = MISES_correlations.fUs(Hs, Hk, H);
@@ -1561,10 +1661,32 @@ classdef aveSlice < kCut
 
             input_file = fullfile(path, 'inp.dat');
             output_file = fullfile(path, 'out.dat');
-            write_mrchbl_input(input_file, xnow, Ue, M, rt, xtrip, th, ds, ct, Kcorr, Kp, Kd);
+            write_mrchbl_input(input_file, xc, Ue, Min, rt, xtrip, th, ds, ct, Kcorr, Kp, Kd);
             mrchbl_path = '~/MISES/MISES/bin/mblrun';
             system([mrchbl_path ' ' input_file ' ' output_file]);
             sol = read_mrchbl_output(output_file);
+
+            if ~isempty(xmatch)
+
+                dst = interp1(x, ds_dns, xmatch);
+                tht = interp1(x, th_dns, xmatch);
+                rtt = interp1(x, rt_dns, xmatch);
+
+                for i=1:5
+                    dsm = interp1(sol.x, sol.delStar, xmatch);
+                    thm = interp1(sol.x, sol.theta, xmatch);
+                    rtm = interp1(sol.x, sol.Re_theta, xmatch);
+    
+                    ds = ds - dsm + dst;
+                    th = th - thm + tht;
+                    rt = rt * (rtt/rtm);
+    
+                    write_mrchbl_input(input_file, xc, Ue, Min, rt, xtrip, th, ds, ct, Kcorr, Kp, Kd);
+                    system([mrchbl_path ' ' input_file ' ' output_file]);
+                    sol = read_mrchbl_output(output_file);
+                end
+            end
+
             
         end
 

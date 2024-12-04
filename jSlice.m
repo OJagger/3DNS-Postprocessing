@@ -4,9 +4,9 @@ classdef jSlice < handle
 
     properties
         NB;
-        gam;
-        cp;
-        rgas;
+        blk;
+        gas;
+        bcs;
         ro;
         u;
         v;
@@ -18,9 +18,6 @@ classdef jSlice < handle
         Y0;
         X;
         Z;
-        blk;
-        gas;
-        bcs;
         pdyn;              % Freestream dynamic pressure
         casepath;
     end
@@ -43,11 +40,15 @@ classdef jSlice < handle
                 ishere = false;
             end
 
-            if nargin > 3
+            if nargin > 0
+
+                obj.blk = blk;
                 obj.gas = gas;
-                obj.gam = gas.gam;
-                obj.cp = gas.cp;
-                obj.rgas = obj.cp*(1-1/obj.gam);
+                obj.bcs = bcs;
+
+            end
+
+            if nargin > 3
                 obj.nSlice = nSlice;
                 obj.time = time;
                 obj.ro = [];
@@ -150,11 +151,11 @@ classdef jSlice < handle
         end
 
         function value = get.p(obj)
-            value = (obj.gam -1)*(obj.Et - 0.5*(obj.u.^2 + obj.v.^2 + obj.w.^2).*obj.ro);
+            value = (obj.gas.gam -1)*(obj.Et - 0.5*(obj.u.^2 + obj.v.^2 + obj.w.^2).*obj.ro);
         end
 
         function value = get.T(obj)
-            value = obj.p./(obj.ro*obj.rgas);
+            value = obj.p./(obj.ro*obj.gas.rgas);
         end
 
         function value = get.vel(obj)
@@ -162,11 +163,11 @@ classdef jSlice < handle
         end
 
         function value = get.M(obj)
-            value  = obj.vel./sqrt(obj.gam*obj.rgas*obj.T);
+            value  = obj.vel./sqrt(obj.gas.gam*obj.gas.rgas*obj.T);
         end
 
         function value = get.s(obj)
-            value = obj.cp*log(obj.T/300) - obj.rgas*log(obj.p/1e5);
+            value = obj.gas.cp*log(obj.T/300) - obj.gas.rgas*log(obj.p/1e5);
         end
 
         function getSize(obj)
@@ -210,7 +211,7 @@ classdef jSlice < handle
         function value = get.mu(obj)
             disp('Calcualting mu')
             pnow = (obj.gas.gam - 1)*(obj.Et - 0.5*(obj.u.^2 + obj.v.^2 + obj.w.^2).*obj.ro);
-            Tnow = pnow./(obj.ro*obj.rgas);
+            Tnow = pnow./(obj.ro*obj.gas.rgas);
             value = obj.gas.mu_ref*(Tnow/obj.gas.mu_tref).^(3/2) .* (obj.gas.mu_cref + obj.gas.mu_tref)./(obj.gas.mu_cref + Tnow);
         end
 

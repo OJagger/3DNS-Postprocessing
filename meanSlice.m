@@ -190,6 +190,9 @@ classdef meanSlice < aveSlice
     
                             case 'gpu'
                                 nstats_prim = 12;
+                                if statstype == 4
+                                    nstats_prim = 11;
+                                end
                                 nstats_budg = nstats-nstats_prim;
                                 flopath = fullfile(basedir,  ['mean2_' num2str(nb) '_' num2str(obj.nMean)]);
                                 flofile = fopen(flopath,'r');
@@ -201,36 +204,65 @@ classdef meanSlice < aveSlice
                                 
                                 fclose(flofile);
     
-            
-                                ro = reshape(prim(:,1),ni,nj)/obj.meanTime;
-                                ru = reshape(prim(:,2),ni,nj)/obj.meanTime;
-                                rv = reshape(prim(:,3),ni,nj)/obj.meanTime;
-                                rw = reshape(prim(:,4),ni,nj)/obj.meanTime;
-                                Et = reshape(prim(:,5),ni,nj)/obj.meanTime;
+                                nn = 1;
+                                ro = reshape(prim(:,nn),ni,nj)/obj.meanTime;
+                                nn = nn+1;
+                                ru = reshape(prim(:,nn),ni,nj)/obj.meanTime;
+                                nn = nn+1;
+                                rv = reshape(prim(:,nn),ni,nj)/obj.meanTime;
+                                nn = nn+1;
+                                rw = reshape(prim(:,nn),ni,nj)/obj.meanTime;
+                                nn = nn+1;
+                                Et = reshape(prim(:,nn),ni,nj)/obj.meanTime;
         
-                                ro2 = reshape(prim(:,6),ni,nj)/obj.meanTime;
-                                rou2 = reshape(prim(:,7),ni,nj)/obj.meanTime;
-                                rov2 = reshape(prim(:,8),ni,nj)/obj.meanTime;
-                                row2 = reshape(prim(:,9),ni,nj)/obj.meanTime;
+                                if statstype ~= 4
+                                    nn = nn+1;
+                                    ro2 = reshape(prim(:,nn),ni,nj)/obj.meanTime;
+                                end
+                                nn = nn+1;
+                                rou2 = reshape(prim(:,nn),ni,nj)/obj.meanTime;
+                                nn = nn+1;
+                                rov2 = reshape(prim(:,nn),ni,nj)/obj.meanTime;
+                                nn = nn+1;
+                                row2 = reshape(prim(:,nn),ni,nj)/obj.meanTime;
         
-                                rouv = reshape(prim(:,10),ni,nj)/obj.meanTime;
-                                rouw = reshape(prim(:,11),ni,nj)/obj.meanTime;
-                                rovw = reshape(prim(:,12),ni,nj)/obj.meanTime;
+                                nn = nn+1;
+                                rouv = reshape(prim(:,nn),ni,nj)/obj.meanTime;
+                                nn = nn+1;
+                                rouw = reshape(prim(:,nn),ni,nj)/obj.meanTime;
+                                nn = nn+1;
+                                rovw = reshape(prim(:,nn),ni,nj)/obj.meanTime;
         
-                                p2 = reshape(budg(:,1),ni,nj)/obj.meanTime;
+                                nn = 1;
+                                if statstype ~= 4
+                                    p2 = reshape(budg(:,nn),ni,nj)/obj.meanTime;
+                                    nn = nn+1;
+                                end
     
-                                rous = reshape(budg(:,2),ni,nj)/obj.meanTime;
-                                rovs = reshape(budg(:,3),ni,nj)/obj.meanTime;
-                                rows = reshape(budg(:,4),ni,nj)/obj.meanTime;
+                                rous = reshape(budg(:,nn),ni,nj)/obj.meanTime;
+                                nn = nn+1;
+                                rovs = reshape(budg(:,nn),ni,nj)/obj.meanTime;
+                                if statstype ~= 4
+                                    nn = nn+1;
+                                    rows = reshape(budg(:,nn),ni,nj)/obj.meanTime;
+                                end
                                 
-                                diss = reshape(budg(:,5),ni,nj)/obj.meanTime;
+                                nn = nn+1;
+                                diss = reshape(budg(:,nn),ni,nj)/obj.meanTime;
                                 
-                                qx_T = reshape(budg(:,6),ni,nj)/obj.meanTime;
-                                qy_T = reshape(budg(:,7),ni,nj)/obj.meanTime;
-                                qz_T = reshape(budg(:,8),ni,nj)/obj.meanTime;
+                                nn = nn+1;
+                                qx_T = reshape(budg(:,nn),ni,nj)/obj.meanTime;
+                                nn = nn+1;
+                                qy_T = reshape(budg(:,nn),ni,nj)/obj.meanTime;
+                                nn = nn+1;
+                                qz_T = reshape(budg(:,nn),ni,nj)/obj.meanTime;
                                 
-                                irrev_gen = reshape(budg(:,9),ni,nj)/obj.meanTime; % Pr/(T^2*mu*cp) * Σqi*qi
-                                diss_T = reshape(budg(:,10),ni,nj)/obj.meanTime;
+                                if statstype ~= 4
+                                    nn = nn+1;
+                                    irrev_gen = reshape(budg(:,nn),ni,nj)/obj.meanTime; % Pr/(T^2*mu*cp) * Σqi*qi
+                                    nn = nn+1;
+                                    diss_T = reshape(budg(:,nn),ni,nj)/obj.meanTime;
+                                end
                             
                         end
     
@@ -334,8 +366,10 @@ classdef meanSlice < aveSlice
             for ip = 1:length(props2add)
                 tmp = {};
                 for ib = 1:obj.NB
-                    tmp{ib} = (obj.(props2add{ip}){ib}*obj.meanTime + ...
-                newSlice.(props2add{ip}){ib}*newSlice.meanTime)/tot_time;
+                    if ~isempty(newSlice.(props2add{ip}))
+                        tmp{ib} = (obj.(props2add{ip}){ib}*obj.meanTime + ...
+                            newSlice.(props2add{ip}){ib}*newSlice.meanTime)/tot_time;
+                    end
                 end
                 obj.(props2add{ip}) = tmp;
                 

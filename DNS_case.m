@@ -781,12 +781,13 @@ classdef DNS_case < handle
                 q = prop;
             end
 
-            hold on
+            
             offset = 0;
             if repeats > 2
                 offset = -obj.pitch;
             end
             axes(ax);
+            hold on
             for ir = 1:repeats
             for i=1:obj.NB
 
@@ -814,22 +815,22 @@ classdef DNS_case < handle
 
             if storedq
                 if string(prop) == "schlieren" || string(prop) == "overlay" 
-                    colormap(gray)
-                    map = colormap;
+                    colormap(ax,gray)
+                    map = colormap(ax);
                     map = flip(map,1);
-                    colormap(map);
+                    colormap(ax,map);
                     if isempty(label)
                         label = '$|\nabla \rho|/\rho$';
                     end
                 elseif ismember(string(prop),["vortZ","v","w", "advK"])
                     val = max(abs(caxis));
-                    caxis([-val val]);
+                    caxis(ax,[-val val]);
                     colormap(redblue)
                 elseif string(prop) == "M" && string(p.Results.ColorMap) == "redblue"
                     if isempty(lims)
                         lims = [0 2];
                     end
-                    colormap(redblue)
+                    colormap(ax,redblue)
                 end
             end
                
@@ -837,12 +838,12 @@ classdef DNS_case < handle
             cb = colorbar;
             if string(prop) == "overlay"
                 if size(lims, 1) == 2
-                    caxis(lims(2, :));
+                    caxis(ax,lims(2, :));
                 else
-                    caxis([0 100]);
+                    caxis(ax,[0 100]);
                 end
             elseif ~isempty(lims)
-                caxis(lims);
+                caxis(ax,lims);
                 
             end
             
@@ -852,16 +853,26 @@ classdef DNS_case < handle
             end
             
             if string(prop) == "overlay" 
-                h = findobj('Type', 'Axes');
-                if length(h) > 1
-                    ax2 = h(h~=ax);
-                    cla(ax2);
+                axes(ax);
+                axis off
+                area = axis(ax);
+                axis on
+                
+                if length(p.Results.ax > 1)
+                    ax2 = p.Results.ax(2);
                 else
-                    ax2 = axes(f);
+                    h = findobj('Type', 'Axes');
+                    if length(h) > 1
+                        ax2 = h(h~=ax);
+                        cla(ax2);
+                    else
+                        ax2 = axes(f);
+                    end
                 end
 
                 axes(ax2);
                 cla(ax2);
+                hold on
 
                 a =2000;
                 b = 2000;
@@ -881,7 +892,7 @@ classdef DNS_case < handle
                         xnow = reshape(coords(1,:), ni, []);
                         ynow = reshape(coords(2,:), ni, []);
         
-                        om = abs(slice.vortZ{1});
+                        om = abs(q2{i});
                         mask = 0.5*(1+tanh((om-a)/b));
         
                         s = pcolor(ax2, xnow, ynow, q2{i});
@@ -892,16 +903,17 @@ classdef DNS_case < handle
 
                 shading('interp')
                 axis equal
-                area = axis(ax);
+                % area = axis(ax);
+                axis(area);
                 aspect = [(area(2)-area(1)) (area(4)-area(3)) 1];
                 pbaspect(aspect);
                 axis off
                 colormap(ax2, redblue);
                 
                 if ~isempty(lims)
-                    caxis(lims(1,:));
+                    caxis(ax2, lims(1,:));
                 else
-                    caxis([-maxnow maxnow]);
+                    caxis(ax2, [-maxnow maxnow]);
                 end
 
 
@@ -1094,6 +1106,8 @@ classdef DNS_case < handle
             fmt = p.Results.fmt;
             linew = p.Results.LineWidth;
 
+            R = [cosd(p.Results.rot) -sind(p.Results.rot); sind(p.Results.rot) cosd(p.Results.rot)];
+
 
             if isempty(slice)
                 disp('here')
@@ -1101,11 +1115,31 @@ classdef DNS_case < handle
             else
                 q = slice.(prop);
             end
+
+            offset = 0;
+            if repeats > 2
+                offset = -obj.pitch;
+            end
+
             hold on
+
+            for ir=1:repeats
             for i=1:obj.NB
+
+                xnow = obj.blk.x{i};
+                ynow = obj.blk.y{i}+offset+(ir-1)*obj.pitch;
+                ni = size(xnow,1);
+
+                coords = [reshape(xnow, 1, []); reshape(ynow, 1, [])];
+                coords = R' * coords;
+
+                xnow = reshape(coords(1,:), ni, []);
+                ynow = reshape(coords(2,:), ni, []);
+
                 a = smoothdata(q{i},1);
                 a = smoothdata(a,2);
-                [~,s] = contour(p.Results.ax, obj.blk.x{i}, obj.blk.y{i}, a, levels, fmt, 'LineWidth', linew);
+                [~,s] = contour(p.Results.ax, xnow, ynow, a, levels, fmt, 'LineWidth', linew);
+            end
             end
             if ~isempty(p.Results.viewarea)
                 aspect = [(p.Results.viewarea(2)-p.Results.viewarea(1)) (p.Results.viewarea(4)-p.Results.viewarea(3)) 1];
@@ -1325,7 +1359,7 @@ classdef DNS_case < handle
             end
         end
 
-        function plot_blade(obj,fmt)
+        function p = plot_blade(obj,fmt)
             if nargin < 2
                 fmt = 'k';
             end
@@ -1341,7 +1375,7 @@ classdef DNS_case < handle
                 xsurf = [xsurf xtemp'];
                 ysurf = [ysurf ytemp'];
             end
-            plot(xsurf,ysurf,fmt)
+            p = plot(xsurf,ysurf,fmt)
         end
 
         function plot_surf_prop(obj,slice,prop,ax,lims)
@@ -3118,6 +3152,83 @@ classdef DNS_case < handle
                 path = fullfile(obj.casepath, [obj.casename '.cas']);
             end
             writeFluentCas3D(path, obj.blk, obj.getBoundaries);
+        end
+
+        function slice = vol2jSlice(obj)
+
+            slice = jSlice(obj.blk, obj.gas, obj.bcs);
+
+
+            x = [];
+            xs = [];
+            y = [];
+            y0 = [];
+
+            for iblk=1:length(obj.blk.oblocks)
+
+                ib = obj.blk.oblocks(iblk);
+                
+                xtmp = obj.blk.x{ib}(:,end-1);
+                xstmp = obj.blk.x{ib}(:,end);
+                ytmp = obj.blk.y{ib}(:,end-1);
+                dxtmp = obj.blk.x{ib}(:,end-1) - obj.blk.x{ib}(:,end);
+                dytmp = obj.blk.y{ib}(:,end-1) - obj.blk.y{ib}(:,end);
+                y0tmp = sqrt(dxtmp.^2+dytmp.^2);
+
+                ro = obj.instFlow.ro{ib}(:,end-1,:);
+                u = obj.instFlow.u{ib}(:,end-1,:);
+                v = obj.instFlow.v{ib}(:,end-1,:);
+                w = obj.instFlow.w{ib}(:,end-1,:);
+                Et = obj.instFlow.Et{ib}(:,end-1,:);
+                
+                if obj.blk.oblocks_flip(iblk) == 1
+                    ro = flip(ro);
+                    u = flip(u);
+                    v = flip(v);
+                    w = flip(w);
+                    Et = flip(Et);
+                    xtmp = flip(xtmp);
+                    ytmp = flip(ytmp);
+                    y0tmp = flip(y0tmp);
+                    xstmp = flip(xstmp);
+                end
+                
+                slice.ro = [slice.ro; ro(1:end-1,:)];
+                slice.u = [slice.u; u(1:end-1,:)];
+                slice.v = [slice.v; v(1:end-1,:)];
+                slice.w = [slice.w; w(1:end-1,:)];
+                slice.Et = [slice.Et; Et(1:end-1,:)];
+                x = [x; xtmp(1:end-1)];
+                y = [y; ytmp(1:end-1)];
+                y0 = [y0; y0tmp(1:end-1)];
+                xs = [xs; xstmp(1:end-1)];
+
+            end
+            x = x';
+            y = y';
+            y0 = y0';
+            [~, iLE] = min(xs);
+            [~, iTE] = max(xs);
+            slice.ro = slice.ro(iLE:iTE,:);
+            slice.u = slice.u(iLE:iTE,:);
+            slice.v = slice.v(iLE:iTE,:);
+            slice.w = slice.w(iLE:iTE,:);
+            slice.Et = slice.Et(iLE:iTE,:);
+
+            x = x(iLE:iTE);
+            y = y(iLE:iTE);
+            y0 = y0(iLE:iTE);
+            slice.ssurf(1) = 0;
+            for i=2:length(x)
+                dx = x(i)-x(i-1);
+                dy = y(i)-y(i-1);
+                ds = sqrt(dx^2 + dy^2);
+                slice.ssurf(i) = slice.ssurf(i-1)+ds;
+            end
+            z = linspace(0,obj.blk.span,obj.blk.nk);
+            [slice.Z, slice.X] = meshgrid(z,slice.ssurf);
+            slice.Y0 = repmat(y0',1,obj.blk.nk);
+            
         end
 
         function mean = inst2ave(obj, sliceNums)

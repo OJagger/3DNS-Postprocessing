@@ -6,7 +6,7 @@ function sol = read_mrchbl_output(path)
         fgetl(f);
     end
 
-    A = fscanf(f, '%f', [15 Inf]);
+    A = fscanf(f, '%f', [18 Inf]);
 
     fclose(f);
 
@@ -18,12 +18,16 @@ function sol = read_mrchbl_output(path)
     sol.H_k = A(8,:);
     sol.H_bar = A(9,:);
     sol.H_ke = A(10,:);
-    sol.Cf = A(11,:);
-    sol.cd = A(12,:);
-    sol.ct = A(13,:);
-    sol.Us = A(14,:);
-    sol.Re_theta = A(15,:);
+    sol.H_rho = A(11,:);
+    sol.Cf = A(12,:);
+    sol.cd = A(13,:);
+    sol.ct = A(14,:);
+    sol.Us = A(15,:);
+    sol.Uq = A(16,:);
+    sol.cteq = A(17,:);
+    sol.Re_theta = A(18,:);
     sol.Pr = (1-sol.Us).*sol.ct;
+    sol.Pr_eq = (1-sol.Us).*sol.cteq;
     
 
 end

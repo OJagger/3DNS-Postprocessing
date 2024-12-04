@@ -52,6 +52,9 @@ classdef flowSlice < handle
         nuSij2;
         duidxj;         % Velocity gradient tensor
         diss_ave;
+        x;
+        y;
+
     end
 
     methods
@@ -203,8 +206,8 @@ classdef flowSlice < handle
         function value = get.flowAng(obj)
             disp('Calculating flow angle')
             value = cell(1,obj.NB);
-            for nb = 1:obj.NB
-                value{nb} = atan2d(obj.v{ib}./obj.u{ib});
+            for ib = 1:obj.NB
+                value{ib} = atan2d(obj.v{ib},obj.u{ib});
             end
         end
 
@@ -216,7 +219,26 @@ classdef flowSlice < handle
             end
         end
 
-        
+        function nb = find_block(obj, x, y)
+            nb = NaN;
+            for ib=1:obj.NB
+                xb = [obj.blk.x{ib}(1:end-1,1); ...
+                    obj.blk.x{ib}(end,1:end-1)'; ...
+                    obj.blk.x{ib}(end:-1:2,end); ...
+                    obj.blk.x{ib}(1,end:-1:2)'];
+
+                yb = [obj.blk.y{ib}(1:end-1,1); ...
+                    obj.blk.y{ib}(end,1:end-1)'; ...
+                    obj.blk.y{ib}(end:-1:2,end); ...
+                    obj.blk.y{ib}(1,end:-1:2)'];
+
+                if inpolygon(x,y,xb,yb)
+                    nb = ib;
+                    break
+                end
+            end
+
+        end        
 
         function value = get.cellSize(obj)
             fprintf('Calculating Cell Sizes\n')
@@ -346,6 +368,14 @@ classdef flowSlice < handle
                 value{ib} = S;
             end
 
+        end
+
+        function value = get.x(obj)
+            value = obj.blk.x;
+        end
+
+        function value = get.y(obj)
+            value = obj.blk.y;
         end
 
         function value = get.duidxj(obj)
@@ -494,6 +524,26 @@ classdef flowSlice < handle
             end
             shading('interp');
             axis equal
+        end
+
+        function value = unstructured_sample(obj, x, y, prop)
+
+            bl = zeros(size(x));
+            value = zeros(size(x));
+
+            for i = 1:length(x)
+                bl(i) = obj.find_block(x(i),y(i));
+            end
+
+            for ib = 1:obj.NB
+                is = bl == ib;
+                if sum(is) > 0
+                    int = scatteredInterpolant(reshape(obj.blk.x{ib},[],1), ...
+                        reshape(obj.blk.y{ib},[],1), reshape(obj.(prop){ib},[],1));
+                    value(is) = int(x(is), y(is));
+                end
+            end
+
         end
 
     end

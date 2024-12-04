@@ -12,7 +12,7 @@ function save_plot(dir, fname, save, fmt)
         for fmt = fmts
             switch fmt
                 case "png"
-                    exportgraphics(f, fullfile(dir, [fname '.png']), 'Resolution',450)
+                    exportgraphics(f, fullfile(dir, [fname '.png']), 'Resolution',1000)
                 case "eps"
                     exportgraphics(f, fullfile(dir, [fname '.eps']))
                 case "svg"
@@ -20,9 +20,11 @@ function save_plot(dir, fname, save, fmt)
                     figure(f)
                     set(gca, 'Color', 'None');
                     plot2svg(fullfile(dir, [fname '.svg']), f, 'png')
+                case 'pdf'
+                    exportgraphics(f, fullfile(dir, [fname '.pdf']))
             end
         end
-        savefig(f, fullfile(dir, [fname '.fig']))
+%        savefig(f, fullfile(dir, [fname '.fig']))
     end
 
 end

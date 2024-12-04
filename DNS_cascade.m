@@ -114,6 +114,27 @@ classdef DNS_cascade < DNS_case
 
         end
 
+        function [y, prof] = wake_profile(obj, slice, xs, prop)
+
+            ymin = 1e4;
+            ymax = -1e4;
+
+            for ib = 1:obj.NB
+                ymin = min(ymin, min(obj.blk.y{ib}, [], 'all'));
+                ymax = max(ymax, max(obj.blk.y{ib}, [], 'all'));
+            end
+
+            n = 401;
+            x(1:n) = xs;
+            y=linspace(ymin, ymax, n);
+
+            ys = slice.unstructured_sample(x, y, 'y');
+            y = linspace(min(ys), max(ys), n);
+
+            prof = slice.unstructured_sample(x, y, prop);
+        end
+
+
 
 
 

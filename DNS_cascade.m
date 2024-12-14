@@ -114,6 +114,19 @@ classdef DNS_cascade < DNS_case
 
         end
 
+        function Re = Re_c(obj)
+
+            cut = kCut(obj.blk, obj.gas, obj.bcs);
+            M1 = M_p0T0V(obj.bcs.Poin, obj.bcs.Toin, obj.bcs.vin);
+            T1 = obj.bcs.Toin * T_T0(M1, obj.gas.gam);
+            ro0 = obj.bcs.Poin/(obj.gas.rgas * obj.bcs.Toin);
+            ro1 = ro0 * ro_ro0(M1, obj.gas.gam);
+
+            mu1 = sutherland_mu(T1, obj.gas.mu_ref, obj.gas.mu_cref, obj.gas.mu_tref);
+            Re = ro1*obj.bcs.vin*cut.c/mu1;
+
+        end
+
         function [y, prof] = wake_profile(obj, slice, xs, prop)
 
             ymin = 1e4;
@@ -134,9 +147,80 @@ classdef DNS_cascade < DNS_case
             prof = slice.unstructured_sample(x, y, prop);
         end
 
+        function sol = write_MISES_input(obj)
+
+            f = fopen(fullfile(obj.casdir, 'stream.mises'));
 
 
+            f = fopen(fullfile(obj.casdir, 'ises.mises'));
+
+        end
+
+        function [bl1, bl2] = read_MISES_bl(obj,ext)
+
+            fpath = fullfile(obj.casepath, 'MISES', ext);
+
+            bl1 = read_mrchbl_output(fullfile(fpath, 'bl1.mises'));
+            bl1.s = bl1.x;
+            Idat = mis_read_idat('mises',fpath);
+            Ises = mis_read_ises('mises',fpath);
+
+            xstag = interp1(Idat.sb{1}, Idat.xb{1}, Idat.sble);
+            ystag = interp1(Idat.sb{1}, Idat.yb{1}, Idat.sble);
+            [~, istag] = max(Idat.sb{1}.*(Idat.sb{1}<Idat.sble));
+            xss = [xstag Idat.xb{1}(istag:-1:1)];
+            yss = [ystag Idat.yb{1}(istag:-1:1)];
+            sb = Idat.sble - Idat.sb{1};
+            sb = [0 sb(istag:-1:1)];
+            scale = obj.pitch/Idat.pitch;
+            bl1.pitch = Idat.pitch;
+
+            cut = kCut(obj.blk, obj.gas, obj.bcs);
+
+            xb = interp1(sb,xss,bl1.x);
+            yb = interp1(sb,yss,bl1.x);
+
+            bl1.s = bl1.s*scale;
+            [xle, ile] = min(xb);
+            yle = yb(ile);
+            bl1.x = scale*(xb-xle);
+            bl1.y = scale*(yb-yle);
+            bl1.delStar = scale*bl1.delStar;
+            bl1.theta = scale*bl1.theta;
+            bl1.cax = 1/scale;
+            bl1.c = cut.c/scale;
+
+            bl1.Res = Ises.reyn*bl1.s;
+            bl1.Re_c = Ises.reyn*bl1.c;
+
+            bl2 = read_mrchbl_output(fullfile(fpath, 'bl2.mises'));
+            bl2.s = bl2.x;
+            Idat = mis_read_idat('mises',fpath);
+            Ises = mis_read_ises('mises',fpath);
+
+            xps = [xstag Idat.xb{1}(istag+1:end)];
+            yps = [ystag Idat.yb{1}(istag+1:end)];
+            sb = Idat.sb{1} - Idat.sble;
+            sb = [0 sb(istag+1:end)];
+            scale = obj.pitch/Idat.pitch;
+            bl2.pitch = Idat.pitch;
 
 
+            xb = interp1(sb,xps,bl2.x);
+            yb = interp1(sb,yps,bl2.x);
+
+            bl2.s = bl2.s*scale;
+            bl2.x = scale*(xb-xle);
+            bl2.y = scale*(yb-yle);
+            bl2.delStar = scale*bl2.delStar;
+            bl2.theta = scale*bl2.theta;
+            bl2.cax = 1/scale;
+            bl2.c = cut.c/scale;
+
+            bl2.Res = Ises.reyn*bl2.s;
+            bl2.Re_c = Ises.reyn*bl2.c;
+
+        end
+            
     end
 end

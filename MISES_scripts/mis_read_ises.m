@@ -69,6 +69,19 @@ else % Read in the file
       store = sscanf(line,'%f');
       Ises.bvr=[store(1),store(2)];
    end
+   if ~feof(F.fid)
+         % Shear lag consts
+       line = fgetl(F.fid);
+       store = sscanf(line,'%f');
+       Ises.Klag = store(1);
+       Ises.Kp = store(2);
+       Ises.Kd= store(3);
+       % Ctau source consts
+       line = fgetl(F.fid);
+       store = sscanf(line,'%f');
+       Ises.Xshock = store(1);
+       Ises.Fctshk = store(2);
+   end
    % Geometry movement, scaling and rotation mode amplitudes
    if ~feof(F.fid)
       line = fgetl(F.fid);

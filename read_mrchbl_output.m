@@ -1,5 +1,17 @@
-function sol = read_mrchbl_output(path)
+function sol = read_mrchbl_output(path, pitch)
 
+    if nargin<2
+        scale = 1;
+    else
+        f = fileparts(path);
+        f = fopen(fullfile(f, 'blade.mises'));
+        l = fgetl(f);
+        temp = str2num(char(split(fgetl(f))));
+        scale = pitch/temp(5);
+    end
+
+
+    system([char("sed -i 's/\*\*\*\*\*\*\*\*\*\*/       NaN/g' ") path])
     f = fopen(path, 'r');
 
     for i=1:6
@@ -10,8 +22,16 @@ function sol = read_mrchbl_output(path)
 
     fclose(f);
 
-    sol.x = A(1,:);
-    sol.Ue = A(2,:);
+    toin = 300;
+    gam = 1.4;
+    cp = 1005;
+    rgas = cp*(gam-1)/gam;
+    a0 = sqrt(gam*rgas*toin);
+
+    sol.x = A(1,:)*scale;
+    sol.Uea0 = A(2,:);
+    sol.Ue = sol.Uea0*a0;
+    sol.M = M_VT0(sol.Ue, toin, gam, cp);
     sol.delStar = A(5,:);
     sol.theta = A(6,:);
     sol.H = A(7,:);

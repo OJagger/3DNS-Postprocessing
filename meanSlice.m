@@ -50,8 +50,11 @@ classdef meanSlice < aveSlice
     end
 
     methods
-        function obj = meanSlice(blk, gas, bcs, casedir, casetype, ishere)
-            obj@aveSlice(blk, gas, bcs);
+        function obj = meanSlice(blk, gas, bcs, casedir, casetype, ishere, iPS)
+            if nargin < 7
+                iPS =false;
+            end
+            obj@aveSlice(blk, gas, bcs, iPS);
             disp('Constructing meanSlice')
 
             if nargin > 0

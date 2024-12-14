@@ -77,8 +77,11 @@ classdef aveSlice < kCut
     end
 
     methods
-        function obj = aveSlice(blk, gas, bcs)
-            obj@kCut(blk, gas, bcs);
+        function obj = aveSlice(blk, gas, bcs, iPS)
+            if nargin < 4
+                iPS = false;
+            end
+            obj@kCut(blk, gas, bcs, iPS);
             disp('Constructing aveSlice')
             obj.nSmooth = round(obj.niBL/50);
         end
@@ -621,6 +624,16 @@ classdef aveSlice < kCut
             value = (0.5/(A*A*B))*obj.H_ke.*(Hknow-1).^3./(obj.H.*Hknow.^2);
 
         end
+
+        function value = cd_eq(obj)
+            % 
+            % Us = obj.Us;
+            % value = 0.5*obj.cf'.*Us + obj.ctau_eq.*(1-Us);
+            % 
+
+            value = obj.cd_mean_strain + obj.blPr_eq;
+        end
+
 
         function plt = blDevPlot(obj, prop, varargin) % ax, lims, xrange, fmt)
 
@@ -1346,7 +1359,7 @@ classdef aveSlice < kCut
             ronow = obj.oGridProp('ro');
             ro_w = ronow(:,1);
 
-            value = sqrt(obj.tau_w./ro_w);
+            value = sqrt(abs(obj.tau_w./ro_w));
 
         end
 
@@ -1591,7 +1604,12 @@ classdef aveSlice < kCut
                 "yBL"];
 
             for i=1:length(props)
-                value.(props(i)) = obj.(props(i))(is);
+                q = obj.(props(i));
+                if size(q,1) == 1
+                    value.(props(i)) = q(is);
+                else
+                    value.(props(i)) = q(is,:);
+                end
             end
             value.x = value.xSurf;
             value.Pr = value.blPr;

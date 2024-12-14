@@ -8,6 +8,10 @@ classdef kCut < flowSlice
         yO;
         iO;
         jO;
+        xLE;
+        yLE;
+        xTE;
+        yTE;
         blkO;
         oblocks;
         oblocks_flip;
@@ -19,6 +23,7 @@ classdef kCut < flowSlice
         ssurf;          % Surface distance fron LE
         owrapblock = 0; % wall topology - 0 for channel, nb of last block in o
                         % grid for closed loop (eg blade profile)
+        iSS = false;
     end
 
     properties (Dependent = true, Hidden = true)
@@ -27,10 +32,23 @@ classdef kCut < flowSlice
     end
 
     methods
-        function obj = kCut(blk, gas, bcs)
+        function obj = kCut(blk, gas, bcs, iPS)
             obj@flowSlice(blk,gas,bcs)
             disp('Constructing kCut')
             if nargin > 0
+
+                if nargin > 3
+                    if islogical(iPS)
+                        obj.iSS = ~iPS;
+                    elseif any(strcmp(iPS,{'ps', 'PS'}))
+                        obj.iSS = false;
+                    else
+                        obj.iSS = true;
+                    end
+                else
+                    obj.iSS = true;
+                end
+                
                 if size(blk.blockdims,1) > 0
                     obj.oblocks = blk.oblocks;
                     obj.oblocks_flip = blk.oblocks_flip;
@@ -92,20 +110,40 @@ classdef kCut < flowSlice
                     xsurf = xo(:,1);
                     [~, obj.iLE] = min(xsurf);
                     [~, obj.iTE] = max(xsurf);
-                    obj.xSurf = xsurf(obj.iLE:obj.iTE);
-                    obj.xO = xo(obj.iLE:obj.iTE,:);
-                    obj.yO = yo(obj.iLE:obj.iTE,:);
-                    obj.iO = io(obj.iLE:obj.iTE,:);
-                    obj.jO = jo(obj.iLE:obj.iTE,:);
-                    obj.blkO = blko(obj.iLE:obj.iTE,:);
+                    if obj.iSS
+                        obj.xSurf = xsurf(obj.iLE:obj.iTE);
+                        obj.xO = xo(obj.iLE:obj.iTE,:);
+                        obj.yO = yo(obj.iLE:obj.iTE,:);
+                        obj.iO = io(obj.iLE:obj.iTE,:);
+                        obj.jO = jo(obj.iLE:obj.iTE,:);
+                        obj.blkO = blko(obj.iLE:obj.iTE,:);
+                   else
+                        obj.xSurf = xsurf([obj.iLE:-1:1 end:-1:obj.iTE]);
+                        obj.xO = xo([obj.iLE:-1:1 end:-1:obj.iTE],:);
+                        obj.yO = yo([obj.iLE:-1:1 end:-1:obj.iTE],:);
+                        obj.iO = io([obj.iLE:-1:1 end:-1:obj.iTE],:);
+                        obj.jO = jo([obj.iLE:-1:1 end:-1:obj.iTE],:);
+                        obj.blkO = blko([obj.iLE:-1:1 end:-1:obj.iTE],:);
+                    end
                     obj.c = sqrt((obj.xO(end,1) - obj.xO(1,1))^2 + (obj.yO(end,1) - obj.yO(1,1))^2);
                     %obj.xSurf = xsurf([obj.iLE:-1:1 end:-1:obj.iTE]);
                     %size(obj.xSurf)
                     R = [0 -1; 1 0];
+                    obj.xLE = obj.xO(1,1);
+                    obj.yLE = obj.yO(1,1);
+                    obj.xTE = obj.xO(end,1);
+                    obj.yTE = obj.yO(end,1);
 
-                    obj.yBL = zeros(obj.iTE-obj.iLE+1,size(xo,2));
+                    if obj.iSS
+                        isurf = obj.iLE:obj.iTE;
+                    else
+                        isurf = [obj.iLE:-1:1 size(xo,1):-1:obj.iTE];
+                    end
+                    obj.yBL = zeros(size(obj.xO));
                     obj.ssurf = zeros(1,size(obj.yBL,1));
-                    for i = obj.iLE:obj.iTE
+                    ii = 0;
+                    for i = isurf
+                        ii = ii +1;
                         if i ==1
                             s1 = [(xo(i+1,1)-xo(i,1)); (yo(i+1,1)-yo(i,1))];
                             n1 = R*s1/norm(s1);
@@ -121,17 +159,17 @@ classdef kCut < flowSlice
                             n2 = R*s2/norm(s2);
                         end
                         nnow = (0.5*(n1+n2)/norm(0.5*(n1+n2)));
-                        obj.n(:,i+1-obj.iLE) = nnow;
+                        obj.n(:,ii) = nnow;
                         for j=1:size(xo,2)
                             dx = xo(i,j) - xo(i,1);
                             dy = yo(i,j) - yo(i,1);
-                            obj.yBL(i+1-obj.iLE,j) = dot(nnow, [dx;dy]);
+                            obj.yBL(ii,j) = dot(nnow, [dx;dy]);
                         end
-                        if i>obj.iLE
-                            dx = xo(i,1) - xo(i-1,1);
-                            dy = yo(i,1) - yo(i-1,1);
+                        if ii>1
+                            dx = obj.xO(ii,1) - obj.xO(ii-1,1);
+                            dy = obj.yO(ii,1) - obj.yO(ii-1,1);
                             ds = sqrt(dx^2 + dy^2);
-                            obj.ssurf(i+1-obj.iLE) = obj.ssurf(i-obj.iLE) + ds;
+                            obj.ssurf(ii) = obj.ssurf(ii-1) + ds;
                         end
                     end
                     obj.niBL = length(obj.xSurf);
@@ -141,6 +179,7 @@ classdef kCut < flowSlice
                     obj.NB = size(blk.blockdims,1);
                     obj.blk = blk;
                 end
+
             end
         end             % End of constructor
 
@@ -204,7 +243,11 @@ classdef kCut < flowSlice
                         blfield = [blfield; temp(2:end,:)];
                     end
                 end
-                blfield = blfield(obj.iLE:obj.iTE,:);
+                if obj.iSS
+                    blfield = blfield(obj.iLE:obj.iTE,:);
+                else
+                    blfield = blfield([obj.iLE:-1:1 end:-1:obj.iTE],:);
+                end
                 %size(blfield,1)
                 %blfield = blfield([obj.iLE:-1:1 end:-1:obj.iTE],:);
                 %size(blfield,1)

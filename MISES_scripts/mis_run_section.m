@@ -125,7 +125,7 @@ else
 end
 
 %% Write ises file
-fid = fopen([directory 'ises.mises'],'w');
+fid = fopen(fullfile(directory, 'ises.mises'),'w');
 fprintf(fid,'%s\n',' 1 2 5 6 15 !Global variables');
 % subsonic
 if f.M<1
@@ -135,10 +135,10 @@ else
     fprintf(fid,'%s\n',' 15 4 3 17 6 !Global constraints');
 end
 
-fprintf(fid,'%6.5f %6.5f %6.5f %6.5f %6.5f ',[f.M f.Pin/f.Poin tand(f.Alpha) -0.66*c.m_chord f.Vtao1]);
+fprintf(fid,'%6.5f %6.5f %6.5f %6.5f %6.5f ',[f.M f.Pin/f.Poin tand(f.Alpha) -1.5*c.m_chord f.Vtao1]);
 fprintf(fid,'%s\n','|Minl p1/p01 Sinl Xinl v1/ao1');
 % fprintf(fid,'0.00000 0.00000 0.00000 %6.5f |Mout p2/p01 Sout Xout\n',1.33*m_chord);
-fprintf(fid,'%6.5f %6.5f %6.5f %6.5f  ', [f.M2 f.Pout/f.Poin tand(f.Alpha2) 1.33*c.m_chord]);
+fprintf(fid,'%6.5f %6.5f %6.5f %6.5f  ', [f.M2 f.Pout/f.Poin tand(f.Alpha2) 2.5*c.m_chord]);
 fprintf(fid,'%s\n','|Mout p2/p01 Sout Xout');
 fprintf(fid,'%s\n','0.00000     0.00000     1.39433     0.00000  | MFR  HWRATin GAMin DIFACTOR');
 fprintf(fid,'%i ',round(f.Re));
@@ -150,6 +150,8 @@ else
 end
 fprintf(fid,'%s\n','4     0.95000  -4.00000  0.00000   | ISMOM  MCRIT  MUCON  PLOSSIN');
 fprintf(fid,'%s\n','0.00000  0.00000   | BVR1in  BVR2in');
+fprintf(fid,'%s\n','5.6  1.0  1.0  | SCC SCP SCD');
+fprintf(fid,'%s\n','-0.071652  1.0  | XSHOCK FCTSHK');
 fclose(fid);
 
 

@@ -12,6 +12,8 @@ function save_plot(dir, fname, save, fmt)
         for fmt = fmts
             switch fmt
                 case "png"
+
+                    % exportgraphics(f, fullfile(dir, [fname '.png']), 'Resolution',128)
                     exportgraphics(f, fullfile(dir, [fname '.png']), 'Resolution',1000)
                 case "eps"
                     exportgraphics(f, fullfile(dir, [fname '.eps']))

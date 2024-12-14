@@ -120,7 +120,7 @@ c.mt = mt; c.xrt = xrt; c.xrt_cl = xrt_cl;
 save([directory 'section.mat'],'c','f');
 
 % Write blade file
-fid = fopen([directory 'blade.mises'],'w');
+fid = fopen(fullfile(directory, 'blade.mises'),'w');
 fprintf(fid,'%s\n','MISES_Section');
 fprintf(fid,'%6.5f %6.5f %3.2f %3.2f %7.6f\n',...
     [tand(c.chi_le) tand(c.chi_te) m_chord m_chord 2*pi / c.N]);
@@ -131,7 +131,7 @@ end
 fclose(fid);
 
 % Write stream file
-fid = fopen([directory 'stream.mises'],'w');
+fid = fopen(fullfile(directory, 'stream.mises'),'w');
 fprintf(fid,'%i\n',0);
 fprintf(fid,'%6.5f %6.5f %6.5f\n',[min(mt(:,1))-0.5 r_le/c.tchord 1.00000]);
 fprintf(fid,'%6.5f %6.5f %6.5f\n',[0.0 r_le/c.tchord 1.00000]);
@@ -142,7 +142,7 @@ fprintf(fid,'%6.5f %6.5f %6.5f\n',[max(mt(:,1))+0.5 r_te/c.tchord f.AVDR]);
 fclose(fid);
 
 % Write ises file
-fid = fopen([directory 'ises.mises'],'w');
+fid = fopen(fullfile(directory, 'ises.mises'),'w');
 fprintf(fid,'%s\n','1 2 5  !Global variables');
 fprintf(fid,'%s\n','1 3 4  !Global constraints');
 fprintf(fid,'%6.5f %6.5f %6.5f %6.5f  ',[f.M 0.0 tand(f.Alpha) -0.66*m_chord]);
@@ -158,10 +158,13 @@ else
 end
 fprintf(fid,'%s\n','4     0.95000  1.00000  0.00000   | ISMOM  MCRIT  MUCON  PLOSSIN');
 fprintf(fid,'%s\n','0.00000  0.00000   | BVR1in  BVR2in');
+fprintf(fid,'%s\n','5.6  1.0  1.0  | SCC SCP SCD');
+fprintf(fid,'%s\n','-0.071652  1.0  | XSHOCK FCTSHK');
+
 fclose(fid);
 
 % Write gridpar file
-fid = fopen([directory 'gridpar.mises'],'w');
+fid = fopen(fullfile(directory, 'gridpar.mises'),'w');
 fprintf(fid,'%s\n','T T');
 fprintf(fid,'%s\n','30   30');
 fprintf(fid,'%s\n','24');

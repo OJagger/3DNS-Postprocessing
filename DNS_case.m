@@ -25,6 +25,7 @@ classdef DNS_case < handle
         inlet_width;
         nj_inlet;
         meanFlow = meanSlice.empty;
+        meanFlowPS = meanSlice.empty;
         ransFlow = RANSSlice.empty;
         meanFlows = {};
         instFlow = volFlow.empty;
@@ -561,7 +562,7 @@ classdef DNS_case < handle
             regions = obj.getIntRegions;
             for ir = 1:length(obj.run)
                 fprintf('Reading meanSlice %d/%d (run %d)\n', [ir length(obj.run) obj.run(ir)])
-                mF = meanSlice(obj.blk,obj.gas,obj.bcs,obj.runpaths{ir},obj.casetype,false);
+                mF = meanSlice(obj.blk,obj.gas,obj.bcs,obj.runpaths{ir},obj.casetype,false, false);
                 if ir == 1
                     obj.meanFlow = mF;
                     if calc_s_unst
@@ -569,6 +570,36 @@ classdef DNS_case < handle
                     end
                 else
                     obj.meanFlow.addSlice(mF)
+                end
+                if ir == length(obj.run)
+                    if calc_s_unst
+                        [e_unst_e, ~, ~, ~, ~] = entropy_balance(mF, regions);
+                    end
+                end
+                clear mF
+            end
+            if calc_s_unst
+                obj.e_unst = e_unst_e - e_unst_s;
+            end
+        end
+
+        function readPsMeanFlows(obj, calc_s_unst)
+            %READMEANFLOWS Read in and average 2D mean flows for multiple
+            %runs
+            if nargin < 2
+                calc_s_unst = false;
+            end
+            regions = obj.getIntRegions;
+            for ir = 1:length(obj.run)
+                fprintf('Reading meanSlice %d/%d (run %d)\n', [ir length(obj.run) obj.run(ir)])
+                mF = meanSlice(obj.blk,obj.gas,obj.bcs,obj.runpaths{ir},obj.casetype,false, true);
+                if ir == 1
+                    obj.meanFlowPS = mF;
+                    if calc_s_unst
+                        [e_unst_s, ~, ~, ~, ~] = entropy_balance(mF, regions);
+                    end
+                else
+                    obj.meanFlowPS.addSlice(mF)
                 end
                 if ir == length(obj.run)
                     if calc_s_unst
@@ -858,7 +889,7 @@ classdef DNS_case < handle
                 area = axis(ax);
                 axis on
                 
-                if length(p.Results.ax > 1)
+                if length(p.Results.ax) > 1
                     ax2 = p.Results.ax(2);
                 else
                     h = findobj('Type', 'Axes');
@@ -1359,9 +1390,12 @@ classdef DNS_case < handle
             end
         end
 
-        function p = plot_blade(obj,fmt)
-            if nargin < 2
+        function p = plot_blade(obj,fmt, rot)
+            if nargin < 2 || isempty(fmt)
                 fmt = 'k';
+            end
+            if nargin < 3
+                rot = 0;
             end
             xsurf = [];
             ysurf = [];
@@ -1375,7 +1409,11 @@ classdef DNS_case < handle
                 xsurf = [xsurf xtemp'];
                 ysurf = [ysurf ytemp'];
             end
-            p = plot(xsurf,ysurf,fmt)
+            R = [cosd(rot) -sind(rot); sind(rot) cosd(rot)];
+            coords = [reshape(xsurf, 1, []); reshape(ysurf, 1, [])];
+            coords = R' * coords;
+
+            p = plot(coords(1,:),coords(2,:),fmt);
         end
 
         function plot_surf_prop(obj,slice,prop,ax,lims)

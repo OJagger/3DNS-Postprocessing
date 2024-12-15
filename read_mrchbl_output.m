@@ -14,7 +14,23 @@ function sol = read_mrchbl_output(path, pitch)
     system([char("sed -i 's/\*\*\*\*\*\*\*\*\*\*/       NaN/g' ") path])
     f = fopen(path, 'r');
 
-    for i=1:6
+    for i=1:3
+        fgetl(f);
+    end
+    temp = split(fgetl(f), '|');
+    temp = str2num(char(split(strtrim(temp(1)))));
+    sol.Klag = temp(1);
+    sol.Kp = temp(2);
+    sol.Kd = temp(3);
+    l = fgetl(f);
+    if contains(l, '|')
+        temp = split(l, '|');
+        temp = str2num(char(split(strtrim(temp(1)))));
+        sol.xShock = temp(1);
+        sol.fctshk = temp(2);
+        fgetl(f);
+        fgetl(f);
+    else
         fgetl(f);
     end
 

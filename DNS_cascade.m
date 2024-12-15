@@ -156,9 +156,13 @@ classdef DNS_cascade < DNS_case
 
         end
 
-        function [bl1, bl2] = read_MISES_bl(obj,ext)
-
-            fpath = fullfile(obj.casepath, 'MISES', ext);
+        function [bl1, bl2] = read_MISES_bl(obj,ext,path)
+            
+            if nargin< 3
+                fpath = fullfile(obj.casepath, 'MISES', ext);
+            else
+                fpath = path;
+            end
 
             bl1 = read_mrchbl_output(fullfile(fpath, 'bl1.mises'));
             bl1.s = bl1.x;
@@ -192,6 +196,11 @@ classdef DNS_cascade < DNS_case
 
             bl1.Res = Ises.reyn*bl1.s;
             bl1.Re_c = Ises.reyn*bl1.c;
+
+            if isfield(bl1,'xShock')
+                bl1.sShock = bl1.xShock;
+                bl1.xShock = interp1(sb,xss,bl1.sShock);
+            end
 
             bl2 = read_mrchbl_output(fullfile(fpath, 'bl2.mises'));
             bl2.s = bl2.x;

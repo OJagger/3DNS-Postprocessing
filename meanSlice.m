@@ -45,6 +45,7 @@ classdef meanSlice < aveSlice
         tau_Re_an_mag;      
         tau_Re_Boussinesq;  % Reynolds stress tensor calculated with 
         omega_opt;
+        omega_opt_cleaned;
         Rij;
         tau_Re_mag;     % RijSij / sqrt(SijSij)
     end
@@ -606,6 +607,36 @@ classdef meanSlice < aveSlice
             end
         end
 
+        function value = get.omega_opt_cleaned(obj)
+            mto = obj.mut_opt_cleaned;
+            mul = obj.mu;
+            ronow = obj.ro;
+            know = obj.k;
+
+            del_all = obj.delta99;
+            offset=1;
+
+            for ib = 1:obj.NB
+                
+                del = del_all(offset:offset+obj.blk.blockdims(ib,1)-1);
+                offset = offset+obj.blk.blockdims(ib,1)-1;
+
+                om = ronow{ib}.*know{ib}./max(mul{ib},mto{ib});
+                value{ib} = abs(om);
+
+                ynow = obj.blk.y{ib};
+
+                for i=1:obj.blk.blockdims(ib,1)
+                    t = 1 - tanh(((ynow(i,:)/del(i) - 0.9)*10));
+                    value{ib}(i,:) = t.*value{ib}(i,:);
+                end
+
+                                
+            end
+
+        end
+
+
         function value = get_p(obj)
             value = obj.pbar;
         end
@@ -631,24 +662,60 @@ classdef meanSlice < aveSlice
             if nargin < 2
                 smoothwindow = 1;
             end
+            del_all = obj.delta99;
+            offset=1;
 
-            mtr = obj.mut_ratio{1}; 
-            ynow = obj.blk.y{1};
-            del = obj.delta99;
+            for ib=1:obj.NB
+                mtr = obj.mut_ratio{ib}; 
+                ynow = obj.blk.y{ib};
 
-            for i=1:obj.blk.blockdims(1,1)
-                
-                mtr_max = max(mtr(i,ynow(i,:) < 0.9*del(i)));
-                lim = mtr_max * (1-tanh(((ynow(i,:)/del(i) - 0.9)*10)));
-                mtr(i,:) = min(mtr(i,:),lim);
+                del = del_all(offset:offset+obj.blk.blockdims(ib,1)-1);
+                offset = offset+obj.blk.blockdims(ib,1)-1;
+    
+                for i=1:obj.blk.blockdims(ib,1)
+                    
+                    mtr_max = max(mtr(i,ynow(i,:) < 0.9*del(i)));
+                    lim = mtr_max * (1-tanh(((ynow(i,:)/del(i) - 0.9)*10)));
+                    mtr(i,:) = min(mtr(i,:),lim);
+                end
+    
+                if smoothwindow > 1
+                    mtr = smoothdata2(mtr, 'lowess',smoothwindow);
+                end
+    
+                value{ib} = mtr.*obj.mu{ib};
             end
 
-            if smoothwindow > 1
-                mtr = smoothdata2(mtr, 'lowess',smoothwindow);
-            end
+        end
 
-            value{1} = mtr.*obj.mu{1};
-            
+        function value = mtr_cleaned(obj, smoothwindow)
+
+            if nargin < 2
+                smoothwindow = 1;
+            end
+            del_all = obj.delta99;
+            offset=1;
+
+            for ib=1:obj.NB
+                mtr = obj.mut_ratio{ib}; 
+                ynow = obj.blk.y{ib};
+
+                del = del_all(offset:offset+obj.blk.blockdims(ib,1)-1);
+                offset = offset+obj.blk.blockdims(ib,1)-1;
+    
+                for i=1:obj.blk.blockdims(ib,1)
+                    
+                    mtr_max = max(mtr(i,ynow(i,:) < 0.9*del(i)));
+                    lim = mtr_max * (1-tanh(((ynow(i,:)/del(i) - 0.9)*10)));
+                    mtr(i,:) = min(mtr(i,:),lim);
+                end
+    
+                if smoothwindow > 1
+                    mtr = smoothdata2(mtr, 'lowess',smoothwindow);
+                end
+    
+                value{ib} = mtr;
+            end
 
         end
 

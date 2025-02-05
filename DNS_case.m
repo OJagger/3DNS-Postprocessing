@@ -59,8 +59,14 @@ classdef DNS_case < handle
             %DNS_CASE Construct an instance of this class
             %   Detailed explanation goes here
             if nargin > 0 && ~isempty(casename)
-                obj.casename = casename;
-                obj.casepath = fullfile(pwd,obj.casename);
+                tmp = split(casename, '/');
+                if length(tmp) > 1
+                    obj.casename = tmp{end};
+                    obj.casepath = casename;
+                else
+                    obj.casename = casename;
+                    obj.casepath = fullfile(pwd,obj.casename);
+                end
                 obj.runpaths = {};
                 
                 if nargin < 2 || isempty(run)
@@ -116,6 +122,7 @@ classdef DNS_case < handle
                 obj.gas.rgas = obj.gas.cp * (obj.gas.gam - 1)/obj.gas.gam;
                 obj.solver = rcase.solver;
                 obj.blk.inlet_blocks{1} = rcase.inlet_blocks;
+                obj.blk.outlet_blocks{1} = rcase.outlet_blocks;
                 obj.blk.z = linspace(0, obj.solver.span, obj.blk.nk);
                 obj.blk.viewarea = [];
                 obj.pitch = 0;
@@ -3159,7 +3166,7 @@ classdef DNS_case < handle
             if nargin < 4
                 path = fullfile(obj.casepath,[obj.casename '_extruded.msh']);
             end
-            blkNodes = writeFluentMeshExtruded(path, obj.blk, obj.blk.next_block, obj.blk.next_patch, bnd, spannow, nknow, true);
+            blkNodes = writeFluentMeshExtruded(path, obj.blk, bnd, spannow, nknow, true);
         end
 
 
@@ -3183,6 +3190,13 @@ classdef DNS_case < handle
         function write_2d_plot3d_mesh(obj)
             path = fullfile(obj.casepath,[obj.casename '_2d.xyz']);
             write_plot3d_2d(obj.blk, path);
+        end
+
+        function writeFluentCas2D(obj, path)
+            if nargin < 2
+                path = fullfile(obj.casepath, [obj.casename '_2d.cas']);
+            end
+            writeFluentCas(path, obj.blk, obj.getBoundaries);
         end
 
         function writeFluentCas3D(obj, path)

@@ -7,7 +7,7 @@ function writeFluentCas3D(path, blk, boundaries)
     % boundaries: struct defining boundary patches
 
     nk = 2;
-    span = 1.0; 
+    span = 0.02; 
 
     meshPath = strrep(path,'.cas','.msh');
     writeFluentMeshExtruded(meshPath, blk, boundaries, span, nk);
@@ -22,6 +22,6 @@ function writeFluentCas3D(path, blk, boundaries)
         '/exit'], meshPath, path);
     fclose(f);
 
-    system(['fluent -r23.1.0 3ddp -g t1 -i' jouPath]);
+    system(['fluent -r24.1.0 3ddp -g t1 -i' jouPath]);
 
 end

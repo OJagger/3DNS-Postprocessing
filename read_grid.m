@@ -1,7 +1,14 @@
 function [blk, blocks] = read_grid(case_name)
     blk = {};
 
-    base_folder = cd;
+    tmp = split(case_name, '/');
+    if length(tmp) > 1
+        case_name = tmp{end};
+        base_folder = fullfile('/', tmp{1:end-1});
+    else
+        base_folder = pwd;
+    end
+
     path = fullfile(base_folder, case_name);
     blocks = readmatrix(fullfile(path, 'blockdims.txt'));
     if size(blocks,1) == 1

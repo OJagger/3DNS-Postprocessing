@@ -214,6 +214,7 @@ else % Read in the file
    try
        [Idat.omeg,Idat.sout] = mis_read_fortran(F.fid,2,'float64');
    catch
+       disp('')
    end
    
    %% dl467 determine Mach number, loss and other primary variable contours

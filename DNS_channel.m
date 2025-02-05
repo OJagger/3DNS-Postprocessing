@@ -201,7 +201,7 @@ classdef DNS_channel < DNS_case
             data.kprof = obj.meanFlow.BLprof(xturb,'k');
             data.mut_opt = obj.meanFlow.BLprof(xturb,'mut_opt');
             data.mut_ratio = obj.meanFlow.BLprof(xturb,'mut_opt_ratio');
-            data.omprof = obj.meanFlow.BLprof(xturb,'omega_opt');
+            data.omprof = obj.meanFlow.BLprof(xturb,'omega_opt_cleaned');
             data.uprof = obj.meanFlow.BLprof(x,'u');
             data.vprof = obj.meanFlow.BLprof(x,'v');
             Vin = sqrt(data.uprof.^2+data.vprof.^2);
@@ -386,9 +386,16 @@ classdef DNS_channel < DNS_case
                 iwrite = true;
             end
 
-            data.x = obj.blk.x{1}(:,end);
-            data.y = obj.blk.y{1}(:,end);
-            data.pprof = obj.meanFlow.p{1}(:,end);
+            blks = (obj.NB-obj.nbi)+1:obj.NB;
+            data.x = obj.blk.x{blks(1)}(1,end);
+            data.y = obj.blk.y{blks(1)}(1,end);
+            data.pprof = obj.meanFlow.p{blks(1)}(1,end);
+
+            for ib=blks
+                data.x = [data.x; obj.blk.x{ib}(2:end,end)];
+                data.y = [data.y; obj.blk.y{ib}(2:end,end)];
+                data.pprof = [data.pprof; obj.meanFlow.p{ib}(2:end,end)];
+            end
             ps = data.pprof(end);
 
             s = fullfile(obj.casepath, 'fluent_freestream_bc_data.prof');

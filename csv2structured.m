@@ -42,7 +42,8 @@ function s = csv2structured(basecase, fname, metadata2set, sample_blk)
             'om', 'specific_diss_rate', ...
             'mut', 'viscosity_turb', ...
             'st', 'strain_rate_mag', ...
-            'walldist', 'walldist');
+            'walldist', 'walldist', ...
+            'walldist2', 'cell_wall_dist');
   
     else
         names = struct('x','Points_0', ...
@@ -66,39 +67,42 @@ function s = csv2structured(basecase, fname, metadata2set, sample_blk)
     wv = zeros(size(uv));
     pv = data.(names.p);
 
-    ri = scatteredInterpolant(xv, yv, rv,'linear','none');
-    ui = scatteredInterpolant(xv, yv, uv,'linear','none');
-    vi = scatteredInterpolant(xv, yv, vv,'linear','none');
-    wi = scatteredInterpolant(xv, yv, wv,'linear','none');
-    pi = scatteredInterpolant(xv, yv, pv,'linear','none');
+    ri = scatteredInterpolant(xv, yv, rv,'linear','boundary');
+    ui = scatteredInterpolant(xv, yv, uv,'linear','boundary');
+    vi = scatteredInterpolant(xv, yv, vv,'linear','boundary');
+    wi = scatteredInterpolant(xv, yv, wv,'linear','boundary');
+    pi = scatteredInterpolant(xv, yv, pv,'linear','boundary');
 
     save_k = false;
     if ismember(string(names.k), convertCharsToStrings(data.Properties.VariableNames))
-        ki = scatteredInterpolant(xv,yv,data.(names.k),'linear','none');
+        ki = scatteredInterpolant(xv,yv,data.(names.k),'linear','boundary');
         save_k = true;
     end
 
     save_om = false;
     if ismember(string(names.om), convertCharsToStrings(data.Properties.VariableNames))
-        oi = scatteredInterpolant(xv,yv,data.(names.om),'linear','none');
+        oi = scatteredInterpolant(xv,yv,data.(names.om),'linear','boundary');
         save_om = true;
     end
 
     save_mut = false;
     if ismember(string(names.mut), convertCharsToStrings(data.Properties.VariableNames))
-        mi = scatteredInterpolant(xv,yv,data.(names.mut),'linear','none');
+        mi = scatteredInterpolant(xv,yv,data.(names.mut),'linear','boundary');
         save_mut = true;
     end
 
     save_st = false;
     if ismember(string(names.st), convertCharsToStrings(data.Properties.VariableNames))
-        si = scatteredInterpolant(xv,yv,data.(names.st),'linear','none');
+        si = scatteredInterpolant(xv,yv,data.(names.st),'linear','boundary');
         save_st = true;
     end
 
     save_walldist = false;
     if ismember(string(names.walldist), convertCharsToStrings(data.Properties.VariableNames))
-        di = scatteredInterpolant(xv,yv,data.(names.walldist),'linear','none');
+        di = scatteredInterpolant(xv,yv,data.(names.walldist),'linear','boundary');
+        save_walldist = true;
+    elseif ismember(string(names.walldist2), convertCharsToStrings(data.Properties.VariableNames))
+        di = scatteredInterpolant(xv,yv,data.(names.walldist2),'linear','boundary');
         save_walldist = true;
     end
 

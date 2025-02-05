@@ -17,6 +17,6 @@ function blkNodes = writeFluentCas(path, blk, boundaries, iWrite)
         '/exit'], meshPath, path);
     fclose(f);
 
-    system(['fluent -r23.1.0 2ddp -g t1 -i' jouPath]);
+    system(['fluent -r24.1.0 2ddp -g t1 -i' jouPath]);
 
 end

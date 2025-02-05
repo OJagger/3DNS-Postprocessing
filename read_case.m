@@ -10,7 +10,14 @@ function rcase = read_case(casename, type, run)
         runpath = ['run' num2str(run(end))];
     end
 
-    base = pwd;
+    tmp = split(casename, '/');
+    if length(tmp) > 1
+        casename = tmp{end};
+        base = fullfile('/', tmp{1:end-1});
+    else
+        base = pwd;
+    end
+
 
     switch type
     
@@ -71,6 +78,10 @@ function rcase = read_case(casename, type, run)
                     temp = str2num(char(split(fgetl(f))));
                     next_block{ib}.jp = temp(1);
                     next_patch{ib}.jp = temp(2);
+                end
+
+                if im == 2 || ip == 2 || jm == 2 || jp == 2
+                    outlet_blks(end+1) = ib;
                 end
         
                 NI{ib} = ni;
@@ -173,7 +184,7 @@ function rcase = read_case(casename, type, run)
                 solver.npp = ceil((npoints/nprocs)^(1/3));
             end
         
-            blk = read_grid(casename);
+            blk = read_grid(fullfile(base, casename));
             blk.blockdims(:,3) = nk
             blk.nk = nk
             blk.span = solver.span;
@@ -199,6 +210,7 @@ function rcase = read_case(casename, type, run)
             nprocs=0;
             npoints=0;
             inlet_blks = [];
+            outlet_blks = [];
 
             for ib=1:NB
                 nijk = str2num(char(split(fgetl(f))));
@@ -246,6 +258,10 @@ function rcase = read_case(casename, type, run)
 
                 if im == 1
                     inlet_blks(end+1) = ib;
+                end
+
+                if im == 2 || ip == 2 || jm == 2 || jp == 2
+                    outlet_blks(end+1) = ib;
                 end
         
                 NI{ib} = ni;
@@ -334,9 +350,14 @@ function rcase = read_case(casename, type, run)
             solver.istats = temp(2);
             solver.istability = 0;
 
-            temp = str2num(char(split(fgetl(f))));
-            solver.ilam = temp(1);
-            bcs.theta = temp(2);
+            try
+                temp = str2num(char(split(fgetl(f))));
+                solver.ilam = temp(1);
+                bcs.theta = temp(2);
+            catch
+                solver.ilam = 0;
+                solver.theta = 0.0;
+            end
         
 %             temp = str2num(char(split(fgetl(f))));
 %             n_in_blks = str2num(fgetl(f));
@@ -361,7 +382,7 @@ function rcase = read_case(casename, type, run)
                 solver.npp = ceil((npoints/nprocs)^(1/3));
             end
         
-            blk = read_grid(casename);
+            blk = read_grid(fullfile(base, casename));
             blk.nk = nk;
             blk.blockdims(:,3) = nk;
             blk.span = solver.span;
@@ -378,6 +399,7 @@ function rcase = read_case(casename, type, run)
             rcase.gas = gas;
             rcase.solver = solver;
             rcase.inlet_blocks = inlet_blks;
+            rcase.outlet_blocks = outlet_blks;
 
     end
 

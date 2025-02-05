@@ -47,6 +47,7 @@ classdef aveSlice < kCut
         Res;            % Surface distance Reynolds No
         blPr;           % Componant of cd due to production of tke
         blPr_eq;        % Coles' equilibrium prodution
+        cPr;            % Non-dimensional local production
         cd_inner;       % Componant of cd dow to mean strain
         cd_mean_strain;
         cd;             % Dissipation coefficient
@@ -65,7 +66,10 @@ classdef aveSlice < kCut
         Re_theta_ps;
         pdyn            % Dynamic pressure, 0.5*rho*V^2
         nu_e            % Boundary layer edge viscosity
+        alpha1;
         alpha2;
+        zeta;           % Entropy loss coefficient
+        Yp;             % Stagnation pressure loss coefficient
         p0out;
         yplus;
         wall_scale;     % Coordinade for wall distance = 1;
@@ -73,7 +77,6 @@ classdef aveSlice < kCut
         mut_ratio;
         RT;             % Hydra stupe turbulent Re
 %         wallDist;
-        Yp;
     end
 
     methods
@@ -265,14 +268,21 @@ classdef aveSlice < kCut
                     dsdy = obj.dsdy;
                     for i=1:size(snow,1)
 
+                        if i == 4094
+                            disp('');
+                        end
                         
                         if isempty(obj.dsdyThresh)
-                            dsdythresh = -0.02*max(abs(dsdy(i,:)));% + 0.98*(temp(i,ceil(size(temp,2)/2))-temp(i,1));
+                            dsdynow = smooth(dsdy(i,:), round(size(dsdy,2)/20));
+                            % dsdythresh = -0.01*max(abs(dsdy(i,:)));% + 0.98*(temp(i,ceil(size(temp,2)/2))-temp(i,1));
+                            dsdythresh = -0.01*max(abs(dsdynow));
                         else
                             dsdythresh = obj.dsdyThresh;
                         end
 
-                        inds = abs(dsdy(i, :)) < abs(dsdythresh);
+                        inds = max(find(abs(dsdy(i,:)) > abs(dsdythresh)));
+                        inds = max(inds):size(dsdy,2);
+                        % inds = abs(dsdy(i, :)) < abs(dsdythresh);
                         splateau = mean(snow(i,inds));
                         sthresh  = 0.98*splateau + 0.02*max(abs(snow(i,:)));
 
@@ -327,9 +337,11 @@ classdef aveSlice < kCut
                     obj.blEdgeMode = mode;
 
             end
+            value(value<5) = nan;
             if obj.iSmoothBL
                 value = round(obj.smooth_dist(value));
             end
+
             obj.blEdgeStore = value;
             
         end
@@ -395,7 +407,8 @@ classdef aveSlice < kCut
             switch mode
                 case "sGradThresh"
                     inds = obj.BLedgeInd("sGradThresh");
-                    for i=1:size(obj.yBL,1)
+                    value(isnan(inds)) = nan;
+                    for i=find(~isnan(inds))
                         value(i) = obj.yBL(i,inds(i));
                     end
                 case "unsflo"
@@ -428,17 +441,21 @@ classdef aveSlice < kCut
                     end
                 case "sThresh"
                     inds = obj.BLedgeInd("sThresh");
-                    for i=1:size(obj.yBL,1)
+                    value(isnan(inds)) = nan;
+                    for i=find(~isnan(inds))
                         value(i) = obj.yBL(i,inds(i));
                     end
                 case "sCombined"
                     inds = obj.BLedgeInd("sCombined");
-                    for i=1:size(obj.yBL,1)
+
+                    value(isnan(inds)) = nan;
+                    for i=find(~isnan(inds))
                         value(i) = obj.yBL(i,inds(i));
                     end
                 case "integralCorrelation"
                     inds = obj.BLedgeInd("integralCorrelation");
-                    for i=1:size(obj.yBL,1)
+                    value(isnan(inds)) = nan;
+                    for i=find(~isnan(inds))
                         value(i) = obj.yBL(i,inds(i));
                     end
             end
@@ -468,7 +485,8 @@ classdef aveSlice < kCut
             ronow = obj.oGridProp('ro');
             Unow = obj.U;
             value = zeros(1,length(inds));
-            for i=1:size(obj.yBL,1)
+            value(isnan(inds)) = NaN;
+            for i=find(~isnan(inds)) 
                 roprof = ronow(i,1:inds(i));
                 Uprof = Unow(i,1:inds(i));
                 ro0 = ronow(i,inds(i));
@@ -484,7 +502,8 @@ classdef aveSlice < kCut
             inds = obj.BLedgeInd;
             Unow = obj.U;
             value = zeros(1,length(inds));
-            for i=1:size(obj.yBL,1)
+            value(isnan(inds)) = NaN;
+            for i=find(~isnan(inds)) 
                 integrand = 1 - Unow(i,1:inds(i))./Unow(i,inds(i));
                 ys = obj.yBL(i,1:inds(i));
                 value(i) = trapz(ys, integrand);
@@ -496,7 +515,8 @@ classdef aveSlice < kCut
             inds = obj.BLedgeInd;
             ronow = obj.oGridProp('ro');
             Unow = obj.U;
-            for i=1:size(obj.yBL,1)
+            value(isnan(inds)) = NaN;
+            for i=find(~isnan(inds)) 
                 roprof = ronow(i,1:inds(i));
                 Uprof = Unow(i,1:inds(i));
                 ro0 = ronow(i,inds(i));
@@ -512,7 +532,8 @@ classdef aveSlice < kCut
             inds = obj.BLedgeInd;
             ronow = obj.oGridProp('ro');
             Unow = obj.U;
-            for i=1:size(obj.yBL,1)
+            value(isnan(inds)) = NaN;
+            for i=find(~isnan(inds)) 
                 roprof = ronow(i,1:inds(i));
                 Uprof = Unow(i,1:inds(i));
                 ro0 = ronow(i,inds(i));
@@ -527,7 +548,8 @@ classdef aveSlice < kCut
         function value = get.theta_k(obj)
             inds = obj.BLedgeInd;
             Unow = obj.U;
-            for i=1:size(obj.yBL,1)
+            value(isnan(inds)) = NaN;
+            for i=find(~isnan(inds)) 
                 Uprof = Unow(i,1:inds(i));
                 U0 = Unow(i,inds(i));
                 integrand = (Uprof/U0).*(1-Uprof/U0);
@@ -541,7 +563,8 @@ classdef aveSlice < kCut
             inds = obj.BLedgeInd;
             ronow = obj.oGridProp('ro');
             Unow = obj.U;
-            for i=1:size(obj.yBL,1)
+            value(isnan(inds)) = NaN;
+            for i=find(~isnan(inds)) 
                 roprof = ronow(i,1:inds(i));
                 Uprof = Unow(i,1:inds(i));
                 ro0 = ronow(i,inds(i));
@@ -579,7 +602,8 @@ classdef aveSlice < kCut
             inds = obj.BLedgeInd;
             ronow = obj.oGridProp('ro');
             Unow = obj.U;
-            for i=1:size(obj.yBL,1)
+            value(isnan(inds)) = NaN;
+            for i=find(~isnan(inds)) 
                 roprof = ronow(i,1:inds(i));
                 Uprof = Unow(i,1:inds(i));
                 ro0 = ronow(i,inds(i));
@@ -1180,7 +1204,7 @@ classdef aveSlice < kCut
             
         end
 
-        function value = get.blPr(obj)
+        function value = get.cPr(obj)
 %             inds = obj.BLedgeInd;
 %             Prnow = obj.oGridProp('Pr');
 %             Unow = obj.U;
@@ -1196,6 +1220,31 @@ classdef aveSlice < kCut
             ronow = obj.oGridProp('ro');
             Unow = obj.U;
             for i=1:size(obj.yBL,1)
+                Ue = Unow(i,inds(i));
+                roe = ronow(i, inds(i));
+                ys = obj.yBL(i,1:inds(i));
+                value(i,:) = Prnow(i,:)./(roe*Ue^3);
+            end
+            
+        end
+
+        function value = get.blPr(obj)
+%             inds = obj.BLedgeInd;
+%             Prnow = obj.oGridProp('Pr');
+%             Unow = obj.U;
+%             for i=1:size(obj.yBL,1)
+%                 Prprof = Prnow(i,1:inds(i));
+%                 Ue = Unow(i,inds(i));
+%                 ys = obj.yBL(i,1:inds(i));
+%                 value(i) = trapz(ys, Prprof)/Ue^3;
+%             end
+
+            inds = obj.BLedgeInd;
+            Prnow = obj.oGridProp('Pr');
+            ronow = obj.oGridProp('ro');
+            Unow = obj.U;
+            value(isnan(inds)) = NaN;
+            for i=find(~isnan(inds)) %1:size(obj.yBL,1)
                 Prprof = Prnow(i,1:inds(i));
                 Ue = Unow(i,inds(i));
                 roe = ronow(i, inds(i));
@@ -1210,7 +1259,8 @@ classdef aveSlice < kCut
             muSij2 = obj.oGridProp('nuSij2');
             Unow = obj.U;
             ronow = obj.oGridProp('ro');
-            for i=1:size(obj.yBL,1)
+            value(isnan(inds)) = NaN;
+            for i=find(~isnan(inds))
                 prof = muSij2(i,1:inds(i));
                 Ue = Unow(i,inds(i));
                 roe = ronow(i, inds(i));
@@ -1225,7 +1275,8 @@ classdef aveSlice < kCut
             diss_ave = obj.oGridProp('diss_ave');
             Unow = obj.U;
             ronow = obj.oGridProp('ro');
-            for i=1:size(obj.yBL,1)
+            value(isnan(inds)) = NaN;
+            for i=find(~isnan(inds))
                 prof = diss_ave(i,1:inds(i));
                 Ue = Unow(i,inds(i));
                 roe = ronow(i, inds(i));
@@ -1253,7 +1304,8 @@ classdef aveSlice < kCut
             size(inds)
             Unow = obj.U;
             thnow = obj.theta;
-            for i=1:length(inds)
+            value(isnan(inds)) = NaN;
+            for i=find(~isnan(inds))
                 value(i) = ronow(i,inds(i)).*Unow(i,inds(i)).*(thnow(i))./munow(i,inds(i));
             end
 
@@ -1262,7 +1314,8 @@ classdef aveSlice < kCut
         function value = get.Ue(obj)
             inds = obj.BLedgeInd;
             Unow = obj.U;                                              
-            for i=1:length(inds)
+            value(isnan(inds)) = NaN;
+            for i=find(~isnan(inds))
                 value(i) = Unow(i,inds(i));
             end
             value = obj.smooth_dist(value);
@@ -1271,7 +1324,8 @@ classdef aveSlice < kCut
         function value = get.Me(obj)
             inds = obj.BLedgeInd;
             Mnow = obj.oGridProp('M');                                             
-            for i=1:length(inds)
+            value(isnan(inds)) = NaN;
+            for i=find(~isnan(inds))
                 value(i) = Mnow(i,inds(i));
             end
             value = obj.smooth_dist(value);
@@ -1281,7 +1335,9 @@ classdef aveSlice < kCut
             inds = obj.BLedgeInd;
             ronow = obj.oGridProp('ro');
             Unow = obj.U;
-            for i=1:length(inds)
+            roe(isnan(inds)) = NaN;
+            Ue(isnan(inds)) = NaN;
+            for i=find(~isnan(inds))
                 roe(i) = ronow(i,inds(i));
                 Ue(i) = Unow(i,inds(i));
             end
@@ -1298,7 +1354,8 @@ classdef aveSlice < kCut
             inds = obj.BLedgeInd;
             Uenow = obj.Ue;
             ronow = obj.oGridProp('ro');
-            for i=1:length(inds)
+            roe(isnan(inds)) = NaN;
+            for i=find(~isnan(inds))
                 roe(i) = ronow(i,inds(i));
             end
             
@@ -1321,7 +1378,8 @@ classdef aveSlice < kCut
         function value = y_ctau_max(obj)
             ctau = obj.ctau;
             [~, inds] = max(ctau,[],2);
-            for i = 1:length(inds)
+            value(isnan(inds)) = NaN;
+            for i=find(~isnan(inds))
                 value(i) = obj.yBL(i,inds(i));
             end
             value = obj.smooth_dist(value);
@@ -1338,7 +1396,9 @@ classdef aveSlice < kCut
             inds = obj.BLedgeInd;
             ronow = obj.oGridProp('ro');
             Unow = obj.U;
-            for i=1:length(inds)
+            roe(isnan(inds)) = NaN;
+            Ue(isnan(inds)) = NaN;
+            for i=find(~isnan(inds))
                 roe(i) = ronow(i,inds(i));
                 Ue(i) = Unow(i,inds(i));
             end
@@ -1452,6 +1512,16 @@ classdef aveSlice < kCut
 
         end
 
+        function [xplusm,yplusm,zplusm] = meanWallCoords(obj)
+            [xplus,yplus,zplus] = obj.wall_coords_offset;
+            xplusm = mean(xplus);
+            yplusm = mean(yplus);
+            zplusm = mean(zplus);
+            fprintf('Mean x+: %4.2f\n', xplusm)
+            fprintf('Mean y+: %4.2f\n', yplusm)
+            fprintf('Mean z+: %4.2f\n', zplusm)
+        end
+
         function plotYplus(obj)
 
             [~,yplus,~] = obj.wall_coords_offset;
@@ -1475,6 +1545,167 @@ classdef aveSlice < kCut
                 (obj.gas.mu_tref+obj.gas.mu_cref)./(Te+obj.gas.mu_cref);
             value = mu_e./roe;
             value = obj.smooth_dist(value);
+        end
+
+        function value = mass_average_inlet(obj, prop, i)
+
+            blks = obj.blk.inlet_blocks{1};
+
+            if nargin < 3
+                i = 20;
+            end
+            
+            flux = 0;
+            mass = 0;
+
+            for ib = blks
+
+                xnow = obj.blk.x{ib}(i,:);
+                ynow = obj.blk.y{ib}(i,:);
+
+                rounow = obj.ro{ib}(i,:).*obj.u{ib}(i,:);
+                rovnow = obj.ro{ib}(i,:).*obj.v{ib}(i,:);
+
+                xfluxnow = obj.ro{ib}(i,:).*obj.u{ib}(i,:).*obj.(prop){ib}(i,:);
+                yfluxnow = obj.ro{ib}(i,:).*obj.v{ib}(i,:).*obj.(prop){ib}(i,:);
+
+                mass = mass + trapz(ynow,rounow) - trapz(xnow, rovnow);
+                flux = flux + trapz(ynow, xfluxnow) - trapz(xnow, yfluxnow);
+
+            end
+
+            value = flux/mass;
+            
+        end
+
+        function value = mass_average_outlet(obj, prop, i)
+
+            blks = obj.blk.outlet_blocks{1};
+
+            if nargin < 3
+                i = obj.blk.blockdims(blks(1), 1) - 20;
+            end
+            
+            flux = 0;
+            mass = 0;
+
+            for ib = blks
+
+                xnow = obj.blk.x{ib}(i,:);
+                ynow = obj.blk.y{ib}(i,:);
+
+                rounow = obj.ro{ib}(i,:).*obj.u{ib}(i,:);
+                rovnow = obj.ro{ib}(i,:).*obj.v{ib}(i,:);
+
+                xfluxnow = obj.ro{ib}(i,:).*obj.u{ib}(i,:).*obj.(prop){ib}(i,:);
+                yfluxnow = obj.ro{ib}(i,:).*obj.v{ib}(i,:).*obj.(prop){ib}(i,:);
+
+                mass = mass + trapz(ynow,rounow) - trapz(xnow, rovnow);
+                flux = flux + trapz(ynow, xfluxnow) - trapz(xnow, yfluxnow);
+
+            end
+
+            value = flux/mass;
+            
+        end
+
+        function value = area_average_inlet(obj, prop, i)
+
+            blks = obj.blk.inlet_blocks{1};
+
+            if nargin < 3
+                i = 20;
+            end
+            
+            flux = 0;
+            area = 0;
+
+            for ib = blks
+
+                xnow = obj.blk.x{ib}(i,:);
+                ynow = obj.blk.y{ib}(i,:);
+
+                dx = diff(xnow);
+                dy = diff(ynow);
+                ds = sqrt(dx.^2+dy.^2);
+                s = [0 cumsum(ds)];
+                
+                area = area + trapz(s, ones(size(s)));
+                flux = flux + trapz(s, obj.(prop){ib}(i,:));
+
+            end
+
+            value = flux/area;
+            
+        end
+        
+        function value = area_average_outlet(obj, prop, i)
+
+            blks = obj.blk.outlet_blocks{1};
+
+            if nargin < 3
+                i = obj.blk.blockdims(blks(1), 1) - 20;
+            end
+            
+            flux = 0;
+            area = 0;
+
+            for ib = blks
+
+                xnow = obj.blk.x{ib}(i,:);
+                ynow = obj.blk.y{ib}(i,:);
+
+                dx = diff(xnow);
+                dy = diff(ynow);
+                ds = sqrt(dx.^2+dy.^2);
+                s = [0 cumsum(ds)];
+
+                area = area + trapz(s, 1);
+                flux = flux + trapz(s, obj.(prop){ib}(i,:));
+
+            end
+
+            value = flux/area;
+            
+        end
+
+        function value = get.alpha1(obj)
+            inlet_blks = obj.blk.inlet_blocks{1};
+            xmom = 0;
+            ymom = 0;
+            alp = [];
+            ynow = [];
+            ronow = [];
+            den = 0;
+            num = 0;
+            mass = 0;
+            roave = 0;
+            for ib = inlet_blks
+                i=20;%size(obj.blk.x{ib},1);
+%                 ynow = [ynow obj.blk.y{ib}(i,:)];
+%                 alp = [alp obj.v{ib}(i,:)./obj.u{ib}(i,:)];
+%                 ronow = [ronow obj.ro{ib}(i,:)];
+                ynow = obj.blk.y{ib}(i,:);
+%                 anow = atand(obj.u{ib}(i,:)./obj.v{ib}(i,:));
+                rounow = obj.ro{ib}(i,:).*obj.u{ib}(i,:);
+                rouvnow = obj.ro{ib}(i,:).*obj.u{ib}(i,:).*obj.v{ib}(i,:);
+%                 mnow = obj.ro{ib}(i,:).*obj.u{ib}(i,:);
+%                 num = num+trapz(ynow,anow.*mnow);
+%                 den = den+trapz(ynow,mnow);
+                mass = mass + trapz(ynow,rounow);
+                roave = roave + trapz(ynow, obj.ro{ib}(i,:));
+                ymom = ymom + trapz(ynow,rouvnow);
+            end
+%             [ynow, is] = sort(ynow);
+%             ronow = ronow(is);
+%             alp = alp(is);
+            v = ymom/mass;
+            u = mass/roave;
+
+            value = atan2d(v,u);
+%             value = num/den;
+            
+
         end
 
         function value = get.alpha2(obj)
@@ -1513,6 +1744,91 @@ classdef aveSlice < kCut
             value = atan2d(v,u);
 %             value = num/den;
             
+
+        end
+
+        function value = get.zeta(obj)
+            T0now = obj.mass_average_outlet('T0', 20);
+            dsnow = obj.mass_average_outlet('s', 20) - obj.mass_average_inlet('s', 20);
+            h0now = obj.mass_average_inlet('h0', 20);
+            hnow = obj.mass_average_inlet('h', 20);
+
+            value = (T0now*dsnow)/(h0now-hnow);
+                    
+        end
+
+        function value = pout(obj)
+            outlet_blks = obj.blk.outlet_blocks{1};
+            xmom = 0;
+            ymom = 0;
+            alp = [];
+            ynow = [];
+            ronow = [];
+            den = 0;
+            num = 0;
+            mass = 0;
+            roave = 0;
+            roup = 0;
+            for ib = outlet_blks
+                i=size(obj.blk.x{ib},1);
+%                 ynow = [ynow obj.blk.y{ib}(i,:)];
+%                 alp = [alp obj.v{ib}(i,:)./obj.u{ib}(i,:)];
+%                 ronow = [ronow obj.ro{ib}(i,:)];
+                ynow = obj.blk.y{ib}(i,:);
+%                 anow = atand(obj.u{ib}(i,:)./obj.v{ib}(i,:));
+                rounow = obj.ro{ib}(i,:).*obj.u{ib}(i,:);
+                roupnow = obj.ro{ib}(i,:).*obj.u{ib}(i,:).*obj.p{ib}(i,:);
+                % rouvnow = obj.ro{ib}(i,:).*obj.u{ib}(i,:).*obj.v{ib}(i,:);
+%                 mnow = obj.ro{ib}(i,:).*obj.u{ib}(i,:);
+%                 num = num+trapz(ynow,anow.*mnow);
+%                 den = den+trapz(ynow,mnow);
+                mass = mass + trapz(ynow,rounow);
+                roup = roup + trapz(ynow, roupnow);
+                % ymom = ymom + trapz(ynow,rouvnow);
+            end
+%             [ynow, is] = sort(ynow);
+%             ronow = ronow(is);
+%             alp = alp(is);
+            % v = ymom/mass;
+            % u = mass/roave;
+
+            value = roup/mass;
+%             value = num/den;
+            
+
+        end
+
+        function value = mdot(obj, bnd)
+            if nargin < 2
+                bnd = 'outlet';
+            end
+
+            switch bnd
+                case 'inlet'
+                    blks = obj.blk.inlet_blocks{1};
+                    i=20;
+                case 'outlet'
+                    blks = obj.blk.outlet_blocks{1};
+                    i = obj.blk.blockdims(blks(1), 1) - 20;
+            end
+
+            value = 0;
+
+            for ib=blks
+
+                xnow = obj.blk.x{ib}(i,:);
+                ynow = obj.blk.y{ib}(i,:);
+
+                ru = obj.ro{ib}(i,:).*obj.u{ib}(i,:);
+                rv = obj.ro{ib}(i,:).*obj.v{ib}(i,:);
+                
+                % dx = xnow(2:end)-xnow(1:end-1);
+                % dy = ynow(2:end)-ynow(1:end-1);
+                % ru = 0.5 * (runow(2:end) + runow(1:end-1));
+                % rv = 0.5 * (rvnow(2:end) + rvnow(1:end-1));
+                
+                value = value + trapz(ynow, ru) - trapz(xnow, rv);
+            end
 
         end
 

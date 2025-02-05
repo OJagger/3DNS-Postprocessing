@@ -1,7 +1,6 @@
 function [pmin,bmin]=partition(dir,ncards)
 
-bijk = load([dir,'blockdims.txt'])
-
+bijk = load(fullfile(dir,'blockdims.txt'));
 %ncards = 4
 
 [nb,~] = size(bijk)

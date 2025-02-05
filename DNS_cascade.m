@@ -169,6 +169,9 @@ classdef DNS_cascade < DNS_case
             Idat = mis_read_idat('mises',fpath);
             Ises = mis_read_ises('mises',fpath);
 
+            bl1.sinl = Ises.sinl;
+            bl1.sout = Ises.sout;
+
             xstag = interp1(Idat.sb{1}, Idat.xb{1}, Idat.sble);
             ystag = interp1(Idat.sb{1}, Idat.yb{1}, Idat.sble);
             [~, istag] = max(Idat.sb{1}.*(Idat.sb{1}<Idat.sble));
@@ -229,6 +232,15 @@ classdef DNS_cascade < DNS_case
             bl2.Res = Ises.reyn*bl2.s;
             bl2.Re_c = Ises.reyn*bl2.c;
 
+        end
+
+        function blkNodes = writeFluentMeshExtrudedNoPeriodics(obj, spannow, nknow, path)
+            bnd = obj.getBoundaries;
+            
+            if nargin < 4
+                path = fullfile(obj.casepath,[obj.casename '_extruded.msh']);
+            end
+            blkNodes = writeFluentMeshExtruded(path, obj.blk, bnd, spannow, nknow, true);
         end
             
     end

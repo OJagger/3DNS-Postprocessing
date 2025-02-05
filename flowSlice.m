@@ -40,6 +40,8 @@ classdef flowSlice < handle
         nu;             % Kinematic viscosity
         p0;
         T0;
+        h;              % Enthalpy;
+        h0;             % Stagnation enthalpy
         schlieren;      % |grad(ro)|/ro
         cellSize;
         St;
@@ -159,6 +161,20 @@ classdef flowSlice < handle
             Mnow = obj.M;
             for nb = 1:obj.NB
                 value{nb} = tnow{nb}.*(1+0.5*(obj.gas.gam-1)*Mnow{nb}.^2);
+            end
+        end
+
+        function value = get.h(obj)
+            tnow = obj.T;
+            for nb = 1:obj.NB
+                value{nb} = obj.gas.cp*tnow{nb};
+            end
+        end
+
+        function value = get.h0(obj)
+            t0now = obj.T0;
+            for nb = 1:obj.NB
+                value{nb} = obj.gas.cp*t0now{nb};
             end
         end
 

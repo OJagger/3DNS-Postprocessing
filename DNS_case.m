@@ -2016,6 +2016,30 @@ classdef DNS_case < handle
 % 
 %         end
 
+        function plot_surf(obj)
+
+            for ib = obj.blk.oblocks
+            
+                plot3(obj.blk.x{ib}(:,end), obj.blk.y{ib}(:,end), zeros(size(obj.blk.x{ib}(:,end))), 'k');
+                hold on
+                plot3(obj.blk.x{ib}(:,end), obj.blk.y{ib}(:,end), obj.blk.span*ones(size(obj.blk.x{ib}(:,end))), 'k');
+                axis equal
+            end
+
+
+        end
+
+        function plot_surf_2d(obj)
+
+            for ib = obj.blk.oblocks
+                hold on
+                plot(obj.blk.x{ib}(:,end), obj.blk.y{ib}(:,end), 'k');
+                axis equal
+            end
+
+
+        end
+
         function plot_mesh(obj, skip, ax, label_blocks)
             if nargin<2 || isempty(skip)
                 skip=8;

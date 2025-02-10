@@ -1747,8 +1747,51 @@ classdef aveSlice < kCut
 
         end
 
+        function value = plot_wake(obj, prop, x)
+
+            i = find_nearest(obj.blk.x{obj.blk.outlet_blocks{1}(1)}(:,1), x);
+    
+            y = [];
+            prof = [];
+
+            switch prop
+                case 'zeta'
+
+                    h0in = obj.mass_average_inlet('h0', 20);
+                    hin = obj.mass_average_inlet('h', 20);
+                    sin = obj.mass_average_inlet('s', 50);
+                    T2 = obj.mass_average_outlet('T', i);
+                    scale = T2/(h0in-hin);
+
+                    tmp = obj.s;
+                    offset = sin;
+                case 'alpha'
+                    tmp = obj.flowAng;
+                    scale=1;
+                    offset=0;
+            end
+        
+        
+            for ib = obj.blk.outlet_blocks{1}
+                y = [y obj.blk.y{ib}(i,1:end-1)];
+                prof = [prof tmp{ib}(i,1:end-1)];
+            end
+
+            prof = scale*(prof-offset);
+        
+            [yprof, inds] = sort(y);
+            prof = prof(inds);
+
+            yprof = (yprof-yprof(1))/(yprof(end)-yprof(1));
+
+            plot(yprof, prof)
+
+        end
+
+
+
         function value = get.zeta(obj)
-            T0now = obj.mass_average_outlet('T0', 20);
+            Tnow = obj.mass_average_outlet('T', 20);
             dsnow = obj.mass_average_outlet('s', 20) - obj.mass_average_inlet('s', 20);
             h0now = obj.mass_average_inlet('h0', 20);
             hnow = obj.mass_average_inlet('h', 20);

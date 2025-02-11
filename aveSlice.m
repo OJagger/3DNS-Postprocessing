@@ -1747,8 +1747,11 @@ classdef aveSlice < kCut
 
         end
 
-        function value = plot_wake(obj, prop, x)
+        function value = plot_wake(obj, prop, x, fmt)
 
+	    if nargin < 4
+		    fmt = '';
+	    end
             i = find_nearest(obj.blk.x{obj.blk.outlet_blocks{1}(1)}(:,1), x);
     
             y = [];
@@ -1769,6 +1772,11 @@ classdef aveSlice < kCut
                     tmp = obj.flowAng;
                     scale=1;
                     offset=0;
+	    	case 'alpha_norm'
+		    tmp = obj.flowAng
+		    scale = 1;
+		    offset = obj.alpha2;
+	    
             end
         
         
@@ -1784,7 +1792,7 @@ classdef aveSlice < kCut
 
             yprof = (yprof-yprof(1))/(yprof(end)-yprof(1));
 
-            plot(yprof, prof)
+            plot(yprof, prof, fmt)
 
         end
 

@@ -64,6 +64,7 @@ function sol = read_mrchbl_output(path, pitch)
     sol.Re_theta = A(18,:);
     sol.Pr = (1-sol.Us).*sol.ct;
     sol.Pr_eq = (1-sol.Us).*sol.cteq;
+    sol.delta = (3.15 + 1.72./(sol.H_bar - 1) + sol.H_bar ).*sol.theta;
     
 
 end

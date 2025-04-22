@@ -3,6 +3,7 @@ classdef kCut < flowSlice
 
     properties
         xSurf;
+        xBL;
         yBL;
         xO;
         yO;
@@ -29,6 +30,10 @@ classdef kCut < flowSlice
     properties (Dependent = true, Hidden = true)
         vortZ;          % Z vorticity
         aspect_ratio;
+        DUDX;
+        DUDY;
+        DVDX;
+        DVDY;
     end
 
     methods
@@ -164,6 +169,7 @@ classdef kCut < flowSlice
                             dx = xo(i,j) - xo(i,1);
                             dy = yo(i,j) - yo(i,1);
                             obj.yBL(ii,j) = dot(nnow, [dx;dy]);
+                            obj.xBL(ii,j) = obj.xSurf(ii);
                         end
                         if ii>1
                             dx = obj.xO(ii,1) - obj.xO(ii-1,1);
@@ -190,6 +196,30 @@ classdef kCut < flowSlice
                 [~, dudy] = gradHO(obj.blk.x{nb},obj.blk.y{nb},obj.u{nb});
                 [dvdx, ~] = gradHO(obj.blk.x{nb},obj.blk.y{nb},obj.v{nb});
                 value{nb} = dvdx - dudy;
+            end
+        end
+
+        function value = get.DUDX(obj)
+            for ib=1:obj.NB
+                [value{ib},~] = gradHO(obj.blk.x{ib},obj.blk.y{ib},obj.u{ib});
+            end
+        end
+
+        function value = get.DUDY(obj)
+            for ib=1:obj.NB
+                [~,value{ib}] = gradHO(obj.blk.x{ib},obj.blk.y{ib},obj.u{ib});
+            end
+        end
+
+        function value = get.DVDX(obj)
+            for ib=1:obj.NB
+                [value{ib},~] = gradHO(obj.blk.x{ib},obj.blk.y{ib},obj.v{ib});
+            end
+        end
+
+        function value = get.DVDY(obj)
+            for ib=1:obj.NB
+                [~,value{ib}] = gradHO(obj.blk.x{ib},obj.blk.y{ib},obj.v{ib});
             end
         end
 
@@ -238,15 +268,15 @@ classdef kCut < flowSlice
                     if size(blfield,1) == 0
                         blfield = temp;
                     elseif nb == obj.owrapblock
-                        blfield = [blfield; temp(2:end-1,:)];
+                        blfield = [blfield; temp(2:end-1,:,:,:)];
                     else
-                        blfield = [blfield; temp(2:end,:)];
+                        blfield = [blfield; temp(2:end,:,:,:)];
                     end
                 end
                 if obj.iSS
-                    blfield = blfield(obj.iLE:obj.iTE,:);
+                    blfield = blfield(obj.iLE:obj.iTE,:,:,:);
                 else
-                    blfield = blfield([obj.iLE:-1:1 end:-1:obj.iTE],:);
+                    blfield = blfield([obj.iLE:-1:1 end:-1:obj.iTE],:,:,:);
                 end
                 %size(blfield,1)
                 %blfield = blfield([obj.iLE:-1:1 end:-1:obj.iTE],:);
@@ -297,6 +327,29 @@ classdef kCut < flowSlice
             vals = obj.(prop);
             i = obj.x2ind(x);
             value = vals(i);
+        end
+
+        function [value, y] = pitchwise_profile(obj, x, prop)
+
+            for ib = 1:obj.NB
+                ymin(ib) = min(obj.blk.y{ib}, [], 'all');
+                ymax(ib) = max(obj.blk.y{ib}, [], 'all');
+            end
+
+            ymin = min(ymin);
+            ymax = max(ymax);
+
+            n = 200;
+            y = linspace(ymin, ymax, n);
+            x(1:n) = x;
+
+            value = obj.unstructured_sample(x, y, prop);
+
+            [xb, yb] = domain_boundary(obj.blk);
+            inds = inpolygon(x,y,xb,yb);
+            value = value(inds);
+            y = y(inds);
+
         end
 
         function plot(obj,prop,ax,lims,label,viewarea,rot)
@@ -459,6 +512,27 @@ classdef kCut < flowSlice
                         newFlow.(p{i}){ib} = di(newcase.blk.x{ib}, newcase.blk.y{ib});
                     end
                 end
+            end
+
+        end
+
+        function value = align_tensor_with_surface(obj, prop)
+
+            q = obj.oGridProp(prop);
+            value = zeros(size(q));
+            
+            for i=1:size(q,1)
+
+                n = obj.n(:,i);
+                R = [n(2) -n(1)   0; ...
+                     n(1)  n(2)   0; ...
+                     0     0      1];
+
+                for j=1:size(q,2)
+                    value(i,j,:,:) = R*squeeze(q(i,j,:,:))*R';
+                end
+
+
             end
 
         end

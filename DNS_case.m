@@ -826,6 +826,23 @@ classdef DNS_case < handle
             end
             axes(ax);
             hold on
+            if size(q) == size(slice.yBL)
+
+                xnow = slice.xO;
+                ynow = slice.yO;
+                ni = size(xnow,1);
+
+                coords = [reshape(xnow, 1, []); reshape(ynow, 1, [])];
+                coords = R' * coords;
+
+                xnow = reshape(coords(1,:), ni, []);
+                ynow = reshape(coords(2,:), ni, []);
+
+
+                s = pcolor(ax, xnow, ynow, q);
+
+            
+            else
             for ir = 1:repeats
             for i=1:obj.NB
 
@@ -841,6 +858,7 @@ classdef DNS_case < handle
 
 
                 s = pcolor(ax, xnow, ynow, q{i});
+            end
             end
             end
             shading('interp')
@@ -1161,6 +1179,25 @@ classdef DNS_case < handle
 
             hold on
 
+            if size(q) == size(slice.yBL)
+
+                xnow = slice.xO;
+                ynow = slice.yO;
+                ni = size(xnow,1);
+
+                coords = [reshape(xnow, 1, []); reshape(ynow, 1, [])];
+                coords = R' * coords;
+
+                xnow = reshape(coords(1,:), ni, []);
+                ynow = reshape(coords(2,:), ni, []);
+
+
+                a = smoothdata(q,1);
+                a = smoothdata(a,2);
+                [~,s] = contour(p.Results.ax, xnow, ynow, a, levels, fmt, 'LineWidth', linew);
+
+            
+            else
             for ir=1:repeats
             for i=1:obj.NB
 
@@ -1177,6 +1214,7 @@ classdef DNS_case < handle
                 a = smoothdata(q{i},1);
                 a = smoothdata(a,2);
                 [~,s] = contour(p.Results.ax, xnow, ynow, a, levels, fmt, 'LineWidth', linew);
+            end
             end
             end
             if ~isempty(p.Results.viewarea)
@@ -1398,9 +1436,9 @@ classdef DNS_case < handle
         end
 
         function p = plot_blade(obj,fmt, rot)
-            if nargin < 2 || isempty(fmt)
-                fmt = 'k';
-            end
+            % if nargin < 2 || isempty(fmt)
+            %     fmt = 'k';
+            % end
             if nargin < 3
                 rot = 0;
             end
@@ -1420,7 +1458,12 @@ classdef DNS_case < handle
             coords = [reshape(xsurf, 1, []); reshape(ysurf, 1, [])];
             coords = R' * coords;
 
+            if ~isempty(fmt)
             p = plot(coords(1,:),coords(2,:),fmt);
+            else
+            p = patch(coords(1,:), coords(2,:), [0.8 0.8 0.8]);
+            p.LineWidth = 1.5;
+            end
         end
 
         function plot_surf_prop(obj,slice,prop,ax,lims)

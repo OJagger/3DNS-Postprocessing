@@ -12,8 +12,9 @@ classdef RANSSlice < aveSlice
         Pr_store;
 %         StR;
 %         mut;
-        k;
-        omega;
+        k;                    % TKE
+        omega;                % Specific dissipation rate
+        sp;                   % Spalart variable
         Reth;
         gamma;
         trans;          % Transition model on/off
@@ -25,15 +26,19 @@ classdef RANSSlice < aveSlice
     properties (Dependent = true, Hidden = true)
         Pr;             % Turbulence production
         Pr_dist;
+        tau_Re;
     end
 
     methods
-        function obj = RANSSlice(blk, gas, bcs, solver, path)
-            obj@aveSlice(blk, gas, bcs);
+        function obj = RANSSlice(blk, gas, bcs, solver, path, iPS)
+            if nargin < 6
+                iPS = false;
+            end
+            obj@aveSlice(blk, gas, bcs, iPS);
             disp('Constructing RANSSlice')
 
 
-            if nargin > 3
+            if nargin > 3 && ~isempty(solver)
 
                 obj.solver = solver;
                 switch solver
@@ -127,6 +132,21 @@ classdef RANSSlice < aveSlice
 
         end
 
+        function value = get.tau_Re(obj)
+
+            value = cell(1,obj.NB);
+            St = obj.St_an;
+            deltaij(1,1,:,:) = [1 0 0; 0 1 0; 0 0 1];
+
+            for ib=1:obj.NB
+                value{ib} = 2*obj.mut_store{ib}.*St{ib};
+                if ~ strcmp(obj.turb_model, "sa")
+                    value{ib} = value{ib} - (2/3)*(obj.ro{ib}.*obj.k{ib}).*deltaij;
+                end
+            end
+
+        end
+
         function value = get.Pr(obj)
             value = cell(1,obj.NB);
             if ~isempty(obj.Pr_store)
@@ -137,9 +157,16 @@ classdef RANSSlice < aveSlice
                 deltaij(1,1,:,:) = [1 0 0; 0 1 0; 0 0 1];
                 St_an_now = obj.St_an;
                 vgrad = obj.duidxj;
-                for nb = 1:obj.NB
-                    tauij = 2*obj.mut_store{nb}.*St_an_now{nb} - (2/3)*(obj.ro{nb}.*obj.k{nb}).*deltaij;
-                    value{nb} = sum(sum(vgrad{nb}.*tauij, 4), 3);
+                if strcmp(obj.turb_model, "sa")
+                    for nb = 1:obj.NB
+                        tauij = 2*obj.mut_store{nb}.*St_an_now{nb};
+                        value{nb} = sum(sum(vgrad{nb}.*tauij, 4), 3);
+                    end
+                else
+                    for nb = 1:obj.NB
+                        tauij = 2*obj.mut_store{nb}.*St_an_now{nb} - (2/3)*(obj.ro{nb}.*obj.k{nb}).*deltaij;
+                        value{nb} = sum(sum(vgrad{nb}.*tauij, 4), 3);
+                    end
                 end
             elseif ~isempty(obj.mut_ratio_store)
                 disp('Calculating Pr: using stored mut ratio')
@@ -199,6 +226,10 @@ classdef RANSSlice < aveSlice
                 for ib = 1:obj.NB
                     value{ib} = munow{ib}.*obj.mut_ratio_store{ib};
                 end
+            elseif strcmp(obj.turb_model , 'ko')
+                value = obj.mut_koSST;
+            else
+                
             end
         end
 

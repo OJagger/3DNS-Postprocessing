@@ -556,6 +556,7 @@ classdef flowSlice < handle
                 if sum(is) > 0
                     int = scatteredInterpolant(reshape(obj.blk.x{ib},[],1), ...
                         reshape(obj.blk.y{ib},[],1), reshape(obj.(prop){ib},[],1));
+                    int.ExtrapolationMethod = "none";
                     value(is) = int(x(is), y(is));
                 end
             end

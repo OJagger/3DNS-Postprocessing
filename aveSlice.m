@@ -45,7 +45,9 @@ classdef aveSlice < kCut
         Ue;             % BL edge velocity
         Me;             % BL edge Mach number
         Res;            % Surface distance Reynolds No
+        Pr_nondim;
         blPr;           % Componant of cd due to production of tke
+        blPr_dimensional;
         blPr_eq;        % Coles' equilibrium prodution
         cPr;            % Non-dimensional local production
         cd_inner;       % Componant of cd dow to mean strain
@@ -77,6 +79,9 @@ classdef aveSlice < kCut
         mut_ratio;
         RT;             % Hydra stupe turbulent Re
 %         wallDist;
+        pr_aligned_s;
+        pr_aligned_n;
+        pr_aligned_t;
     end
 
     methods
@@ -508,6 +513,7 @@ classdef aveSlice < kCut
                 ys = obj.yBL(i,1:inds(i));
                 value(i) = trapz(ys, integrand);
             end
+            value = reshape(value, [], 1);
             value = obj.smooth_dist(value);
         end
 
@@ -556,6 +562,7 @@ classdef aveSlice < kCut
                 ys = obj.yBL(i,1:inds(i));
                 value(i) = trapz(ys, integrand);
             end
+            value = reshape(value, [], 1);
             value = obj.smooth_dist(value);
         end
 
@@ -736,17 +743,21 @@ classdef aveSlice < kCut
 
             p = inputParser;
 
-            addParameter(p, 'thickness', 'delta99');
+            addParameter(p, 'thickness', []);
 
             parse(p, varargin{:});
 
             del = p.Results.thickness;
 
-            if ischar(del)
-                del = obj.(del);
+            if isempty(del)
+                inds = obj.BLedgeInd;
+            else
+                if ischar(del)
+                    del = obj.(del);
+                end
+    
+                inds = obj.thickness2ind(del);
             end
-
-            inds = obj.thickness2ind(del);
             value = zeros(length(inds),1);
             q = obj.oGridProp(prop);
             for i=1:length(inds)
@@ -1245,6 +1256,9 @@ classdef aveSlice < kCut
             Unow = obj.U;
             value(isnan(inds)) = NaN;
             for i=find(~isnan(inds)) %1:size(obj.yBL,1)
+                if i==476
+                    disp('')
+                end
                 Prprof = Prnow(i,1:inds(i));
                 Ue = Unow(i,inds(i));
                 roe = ronow(i, inds(i));
@@ -1253,6 +1267,36 @@ classdef aveSlice < kCut
             end
             value = obj.smooth_dist(value);
         end
+
+        function value = get.blPr_dimensional(obj)
+%             inds = obj.BLedgeInd;
+%             Prnow = obj.oGridProp('Pr');
+%             Unow = obj.U;
+%             for i=1:size(obj.yBL,1)
+%                 Prprof = Prnow(i,1:inds(i));
+%                 Ue = Unow(i,inds(i));
+%                 ys = obj.yBL(i,1:inds(i));
+%                 value(i) = trapz(ys, Prprof)/Ue^3;
+%             end
+
+            inds = obj.BLedgeInd;
+            Prnow = obj.oGridProp('Pr');
+            ronow = obj.oGridProp('ro');
+            Unow = obj.U;
+            value(isnan(inds)) = NaN;
+            for i=find(~isnan(inds)) %1:size(obj.yBL,1)
+                if i==517
+                    disp('')
+                end
+                Prprof = Prnow(i,1:inds(i));
+                Ue = Unow(i,inds(i));
+                roe = ronow(i, inds(i));
+                ys = obj.yBL(i,1:inds(i));
+                value(i) = trapz(ys, Prprof);%/(roe*Ue^3);
+            end
+            % value = obj.smooth_dist(value);
+        end
+
 
         function value = get.cd_inner(obj)
             inds = obj.BLedgeInd;
@@ -1350,6 +1394,22 @@ classdef aveSlice < kCut
             value = obj.get_ctau;
         end
 
+        % function value = get_ctau(obj)
+        %     inds = obj.BLedgeInd;
+        %     Uenow = obj.Ue;
+        %     ronow = obj.oGridProp('ro');
+        %     roe(isnan(inds)) = NaN;
+        %     for i=find(~isnan(inds))
+        %         roe(i) = ronow(i,inds(i));
+        %     end
+        % 
+        %     Prnow = obj.oGridProp('Pr');
+        %     dUdynow = obj.dUdy;
+        %     tau = Prnow./dUdynow;
+        %     % value = tau./(roe'.*Uenow.^2);
+        %     value = tau./(ronow.*Uenow.^2);
+        % end
+
         function value = get_ctau(obj)
             inds = obj.BLedgeInd;
             Uenow = obj.Ue;
@@ -1360,7 +1420,7 @@ classdef aveSlice < kCut
             end
             
             Prnow = obj.oGridProp('Pr');
-            dUdynow = obj.dUdy;
+            dUdynow = obj.oGridProp('S_an_mag');
             tau = Prnow./dUdynow;
             % value = tau./(roe'.*Uenow.^2);
             value = tau./(ronow.*Uenow.^2);
@@ -1456,25 +1516,44 @@ classdef aveSlice < kCut
 
         
         
-        function blContour(obj, prop, ax, lims, fmt)
-            if nargin < 3 || isempty(ax)
-                ax = gca;
-            end
+        function blContour(obj, prop, varargin)
+
+            defaultAx = gca;
+            % defaultFmt = '';
+
+            p = inputParser;
+
+            addParameter(p, 'ax', defaultAx);
+            addParameter(p, 'fmt', '');
+            addParameter(p, 'scaleY', false);
+            addParameter(p, 'lims', []);
+            addParameter(p, 'label', prop);
+
+            parse(p, varargin{:});
+
+            ax = p.Results.ax;
+
             q = obj.oGridProp(prop);
 
-            if nargin > 4 && ~isempty(fmt)
-                pcolor(ax,obj.xO,obj.yO,q,fmt);
-            else
-                pcolor(ax,obj.xO,obj.yO,q);
+            x = repmat(obj.xSurf, 1, size(obj.yBL,2));
+            y = obj.yBL;
+            if p.Results.scaleY
+                y = y./obj.wall_scale;
             end
+
+            pcolor(ax,x,y,q);
             shading interp
-            axis equal
-            if nargin > 3 && ~isempty(lims)
-                caxis(lims);
+            if ~p.Results.scaleY
+                axis equal
+            end
+            if ~isempty(p.Results.lims)
+                caxis(p.Results.lims);
             end
 
             cb = colorbar(ax,"southoutside");
-            cb.Label.String = string(prop);
+            cb.Label.String = p.Results.label;
+            cb.Label.Interpreter = 'latex';
+            cb.Label.FontSize = 12;
 
         end
 
@@ -1584,6 +1663,8 @@ classdef aveSlice < kCut
 
             if nargin < 3
                 i = obj.blk.blockdims(blks(1), 1) - 20;
+            else 
+                i = obj.blk.blockdims(blks(1), 1) - i;
             end
             
             flux = 0;
@@ -1747,7 +1828,21 @@ classdef aveSlice < kCut
 
         end
 
-        function value = plot_wake(obj, prop, x, fmt)
+        function value = get.Pr_nondim(obj)
+
+            inds = obj.BLedgeInd;
+            Prnow = obj.oGridProp('Pr');
+            ronow = obj.oGridProp('ro');
+            Unow = obj.oGridProp('U');
+            delnow = obj.delta99;
+
+            for i=1:length(inds)
+                value(i,:) = Prnow(i,:)*delnow(i)/(ronow(i, inds(i)) * Unow(i, inds(i))^3);
+            end
+
+        end
+
+        function p = plot_wake(obj, prop, x, fmt)
 
 	    if nargin < 4
 		    fmt = '';
@@ -1792,7 +1887,7 @@ classdef aveSlice < kCut
 
             yprof = (yprof-yprof(1))/(yprof(end)-yprof(1));
 
-            plot(yprof, prof, fmt)
+            p = plot(yprof, prof, fmt)
 
         end
 
@@ -1804,7 +1899,7 @@ classdef aveSlice < kCut
             h0now = obj.mass_average_inlet('h0', 20);
             hnow = obj.mass_average_inlet('h', 20);
 
-            value = (T0now*dsnow)/(h0now-hnow);
+            value = (Tnow*dsnow)/(h0now-hnow);
                     
         end
 
@@ -1968,7 +2063,7 @@ classdef aveSlice < kCut
             props = ["H", "H_k", "H_ke", "H_rho", "delStar", "theta",...
                 "Re_theta", "cf", "cd", "ctau_max", "Ue", "Us", ...
                 "ct", "blPr", "xSurf", "Msurf", "ctau", "wall_scale", ...
-                "yBL"];
+                "yBL", "delta"];
 
             for i=1:length(props)
                 q = obj.(props(i));
@@ -1982,6 +2077,7 @@ classdef aveSlice < kCut
             value.Pr = value.blPr;
             value.Pk = obj.oGridProp('Pr');
             value.roe = obj.edge_prop('ro');
+            value.bl_inds = obj.BLedgeInd;
 
         end
 
@@ -1989,6 +2085,25 @@ classdef aveSlice < kCut
 
             
 
+        end
+
+        function value = get.pr_aligned_s(obj)
+            tau_aligned = obj.align_tensor_with_surface('tau_Re');
+            St_aligned = obj.align_tensor_with_surface('St');
+            value = squeeze(tau_aligned(:,:,1,1)).*squeeze(St_aligned(:,:,1,1));
+        end
+
+        function value = get.pr_aligned_n(obj)
+            tau_aligned = obj.align_tensor_with_surface('tau_Re');
+            St_aligned = obj.align_tensor_with_surface('St');
+            value = squeeze(tau_aligned(:,:,2,2)).*squeeze(St_aligned(:,:,2,2));
+        end
+
+        function value = get.pr_aligned_t(obj)
+            tau_aligned = obj.align_tensor_with_surface('tau_Re');
+            St_aligned = obj.align_tensor_with_surface('St');
+            value = squeeze(tau_aligned(:,:,1,2)).*squeeze(St_aligned(:,:,1,2)) ...
+            +  squeeze(tau_aligned(:,:,2,1)).*squeeze(St_aligned(:,:,2,1));
         end
 
         function sol = run_mrchbl(obj, xstart, path, xtrip, xmatch)

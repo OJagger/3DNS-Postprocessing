@@ -242,6 +242,42 @@ classdef DNS_cascade < DNS_case
             end
             blkNodes = writeFluentMeshExtruded(path, obj.blk, bnd, spannow, nknow, true);
         end
+
+        function writeBDF(obj, fname, params)
+    
+            z = [0 0.01];
+            [xsurf, ysurf] = obj.get_surf;
+            [~, iTE] = max(xsurf);
+            zsurf = ones(size(xsurf));
+
+            alpha1 = deg2rad(params.Alpha);
+            alpha2 = deg2rad(params.Alpha2);
+
+            xin = min(obj.blk.x{obj.blk.inlet_blocks{1}(1)},[],"all");
+            xout = max(obj.blk.x{obj.blk.outlet_blocks{1}(1)},[],"all");
+
+            xtube = [xin 0 1 xout];
+            rtube = ones(size(xtube));
+
+            f = fopen(fname, 'w');
+            fprintf(f, '%s\n', obj.casename);
+            fprintf(f, "2008331 1001 001 'BRRL/PG        Linear Cascade'\n");
+            fprintf(f, "2008331 0 001 'BRRL/PG         Linear Cascade '\n");
+            fprintf(f,'2\t2\t0\n'); % ntubes nblades flipfoil
+            
+            for i=1:2
+
+                fprintf(f, 'Blade %d\n',i);
+                fprintf(f, '4\t2\t3\t%d\t%d\n', [length(xsurf) iTE]); % ntubepoints ile_tube ite_tube npoints ite
+                fprintf(f, '%12.9f\t%12.9f\t%12.9f\t%12.9f\t%12.9f\t%12.9f\n', [alpha1 alpha2 0.001 0.001 alpha1 alpha2]);
+
+                fprintf(f, '%6.3f\t%6.3f\n', [xtube; z(i)*rtube]);
+                fprintf(f, '%12.9f\t%12.9f\t%12.9f\n', [xsurf; ysurf; z(i)*zsurf]);
+
+            end
+            
+
+        end
             
     end
 end

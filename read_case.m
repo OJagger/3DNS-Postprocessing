@@ -29,6 +29,9 @@ function rcase = read_case(casename, type, run)
             NB = str2num(fgetl(f));
             nprocs=0;
             npoints=0;
+            inlet_blks = [];
+            outlet_blks = [];
+
             for ib=1:NB
                 nijk = str2num(char(split(fgetl(f))));
                 nijk_procs = str2num(char(split(fgetl(f))));
@@ -190,15 +193,15 @@ function rcase = read_case(casename, type, run)
             blk.span = solver.span;
             blk.npp = solver.npp;
         
-            rcase.NB = NB;
-            rcase.blk = blk;
-            rcase.next_block = next_block;
-            rcase.next_patch = next_patch;
-            rcase.corner = corner;
-            rcase.bcs = bcs;
-            rcase.gas = gas;
-            rcase.solver = solver;
-            rcase.inlet_blocks = inlet_blks;
+            % rcase.NB = NB;
+            % rcase.blk = blk;
+            % rcase.next_block = next_block;
+            % rcase.next_patch = next_patch;
+            % rcase.corner = corner;
+            % rcase.bcs = bcs;
+            % rcase.gas = gas;
+            % rcase.solver = solver;
+            % rcase.inlet_blocks = inlet_blks;
 
         case 'gpu'
 
@@ -390,18 +393,29 @@ function rcase = read_case(casename, type, run)
             blk.nbg = nBlockGroups;
             blk.block_groups = block;
         
-            rcase.NB = NB;
-            rcase.blk = blk;
-            rcase.next_block = next_block;
-            rcase.next_patch = next_patch;
-            rcase.corner = corner;
-            rcase.bcs = bcs;
-            rcase.gas = gas;
-            rcase.solver = solver;
-            rcase.inlet_blocks = inlet_blks;
-            rcase.outlet_blocks = outlet_blks;
+            % rcase.NB = NB;
+            % rcase.blk = blk;
+            % rcase.next_block = next_block;
+            % rcase.next_patch = next_patch;
+            % rcase.corner = corner;
+            % rcase.bcs = bcs;
+            % rcase.gas = gas;
+            % rcase.solver = solver;
+            % rcase.inlet_blocks = inlet_blks;
+            % rcase.outlet_blocks = outlet_blks;
 
     end
+
+    rcase.NB = NB;
+    rcase.blk = blk;
+    rcase.next_block = next_block;
+    rcase.next_patch = next_patch;
+    rcase.corner = corner;
+    rcase.bcs = bcs;
+    rcase.gas = gas;
+    rcase.solver = solver;
+    rcase.inlet_blocks = inlet_blks;
+    rcase.outlet_blocks = outlet_blks;
 
 end
 

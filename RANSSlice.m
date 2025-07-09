@@ -10,6 +10,7 @@ classdef RANSSlice < aveSlice
         mut_store;            % Eddy viscosity
         mut_ratio_store;      % Eddy viscosity ratio
         Pr_store;
+        tau_store;
 %         StR;
 %         mut;
         k;                    % TKE
@@ -138,12 +139,17 @@ classdef RANSSlice < aveSlice
             St = obj.St_an;
             deltaij(1,1,:,:) = [1 0 0; 0 1 0; 0 0 1];
 
-            for ib=1:obj.NB
-                value{ib} = 2*obj.mut_store{ib}.*St{ib};
-                if ~ strcmp(obj.turb_model, "sa")
-                    value{ib} = value{ib} - (2/3)*(obj.ro{ib}.*obj.k{ib}).*deltaij;
+            if isempty(obj.tau_store)
+                for ib=1:obj.NB
+                    value{ib} = 2*obj.mut_store{ib}.*St{ib};
+                    if ~strcmp(obj.turb_model, "sa")
+                        value{ib} = value{ib} - (2/3)*(obj.ro{ib}.*obj.k{ib}).*deltaij;
+                    end
                 end
+            else
+                value = obj,tau_store;
             end
+
 
         end
 

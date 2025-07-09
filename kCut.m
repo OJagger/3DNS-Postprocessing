@@ -284,6 +284,22 @@ classdef kCut < flowSlice
             end
         end
 
+        function value = hGridProp(obj, prop)
+            value = cell(1,obj.NB);
+            v = obj.(prop);
+            if size(v,2) == 1 || size(v,1) == 1
+                for i=1:length(v)
+                    value{obj.blkO(i,1)}(obj.iO(i,1)) = v(i);
+                end
+            else
+                for i=1:size(v,1)
+                    for j=1:size(v,2)
+                        value{obj.blkO(i,1)}(obj.iO(i,j),obj.jO(i,j)) = v(i,j);
+                    end
+                end
+            end
+        end
+
         function value = blNormGrad(obj,prop)
             q = obj.oGridProp(prop);
             value = (q(:,2)-q(:,1))./(obj.yBL(:,2)-obj.yBL(:,1));
@@ -327,6 +343,10 @@ classdef kCut < flowSlice
             vals = obj.(prop);
             i = obj.x2ind(x);
             value = vals(i);
+        end
+
+        function inlet_profile(obj, prop)
+            [prof, y] = putchwise_profile
         end
 
         function [value, y] = pitchwise_profile(obj, x, prop)

@@ -1435,13 +1435,37 @@ classdef DNS_case < handle
             end
         end
 
-        function p = plot_blade(obj,fmt, rot)
+        function p = plot_blade(obj,fmt, rot, nclock)
             % if nargin < 2 || isempty(fmt)
             %     fmt = 'k';
             % end
-            if nargin < 3
+            if nargin < 3 || isempty(rot)
                 rot = 0;
             end
+            if nargin<2 || isempty(fmt)
+                fmt = '';
+            end
+
+            if nargin < 4
+                nclock = 0;
+            end
+            
+            [xsurf, ysurf] = obj.get_surf;
+            ysurf = ysurf + nclock*obj.blk.pitch;
+            R = [cosd(rot) -sind(rot); sind(rot) cosd(rot)];
+            coords = [reshape(xsurf, 1, []); reshape(ysurf, 1, [])];
+            coords = R' * coords;
+
+            if ~isempty(fmt)
+            p = plot(coords(1,:),coords(2,:),fmt);
+            else
+            p = patch(coords(1,:), coords(2,:), [0.8 0.8 0.8]);
+            p.LineWidth = 1.5;
+            end
+        end
+
+        function [xsurf, ysurf] = get_surf(obj)
+
             xsurf = [];
             ysurf = [];
             for i=1:length(obj.blk.oblocks)
@@ -1454,16 +1478,17 @@ classdef DNS_case < handle
                 xsurf = [xsurf xtemp'];
                 ysurf = [ysurf ytemp'];
             end
-            R = [cosd(rot) -sind(rot); sind(rot) cosd(rot)];
-            coords = [reshape(xsurf, 1, []); reshape(ysurf, 1, [])];
-            coords = R' * coords;
 
-            if ~isempty(fmt)
-            p = plot(coords(1,:),coords(2,:),fmt);
+            [~, iLE] = min(xsurf);
+
+            if ysurf(iLE) > ysurf(iLE+1)
+                xsurf = [xsurf(iLE:-1:1) xsurf(end:-1:iLE+1)];
+                ysurf = [ysurf(iLE:-1:1) ysurf(end:-1:iLE+1)];
             else
-            p = patch(coords(1,:), coords(2,:), [0.8 0.8 0.8]);
-            p.LineWidth = 1.5;
+                xsurf = [xsurf(iLE:end) xsurf(1:iLE-1)];
+                ysurf = [ysurf(iLE:end) ysurf(1:iLE-1)];
             end
+
         end
 
         function plot_surf_prop(obj,slice,prop,ax,lims)
@@ -2527,7 +2552,7 @@ classdef DNS_case < handle
             end
             if iplot
                 ax = gca;
-                obj.kPlot(obj.meanFlow, 'diss',ax,[],'$\phi$');
+                obj.kPlot(obj.meanFlow, 'diss','ax',ax,'label','$\phi$');
                 hold on
                 p = [];
                 for ir = 1:length(regions)
@@ -2585,16 +2610,8 @@ classdef DNS_case < handle
         function nb = find_block(obj, x, y)
             nb = [];
             for ib=1:obj.NB
-                xb = [obj.blk.x{ib}(1:end-1,1); ...
-                    obj.blk.x{ib}(end,1:end-1)'; ...
-                    obj.blk.x{ib}(end:-1:2,end); ...
-                    obj.blk.x{ib}(1,end:-1:2)'];
 
-                yb = [obj.blk.y{ib}(1:end-1,1); ...
-                    obj.blk.y{ib}(end,1:end-1)'; ...
-                    obj.blk.y{ib}(end:-1:2,end); ...
-                    obj.blk.y{ib}(1,end:-1:2)'];
-
+                [xb, yb] = block_boundary(obj.blk, ib);
                 if inpolygon(x,y,xb,yb)
                     nb = ib;
                     break

@@ -42,6 +42,7 @@ classdef aveSlice < kCut
         dsdy;           % Wall normal entropy gradient
         %BLedgeInd;      % j index of detected BL edge
         U;              % Wall-parallel velocity
+        Uplus;          % U/u_tau
         Ue;             % BL edge velocity
         Me;             % BL edge Mach number
         Res;            % Surface distance Reynolds No
@@ -79,9 +80,19 @@ classdef aveSlice < kCut
         mut_ratio;
         RT;             % Hydra stupe turbulent Re
 %         wallDist;
+        first_cell_height;
         pr_aligned_s;
         pr_aligned_n;
         pr_aligned_t;
+        tau_aligned_s;
+        tau_aligned_n;
+        tau_aligned_t;
+        tau_aligned_z;
+        S_aligned_s;
+        S_aligned_n;
+        S_aligned_t;
+        bubble_edge;
+        bubble_edge_ind;
     end
 
     methods
@@ -214,6 +225,13 @@ classdef aveSlice < kCut
             disp('Calculating surface p')
             pnow = obj.oGridProp('p');
             value = pnow(:,1);
+        end
+
+        function value = BLedgeIndOGrid(obj)
+            v = obj.BLedgeInd;
+            for i=1:length(v)
+                value(i) = obj.jO(i,v(i));
+            end
         end
        
 
@@ -1062,6 +1080,10 @@ classdef aveSlice < kCut
             j = BLinds(i);
             if ~isempty(p.Results.yEdge)
                 yEdge = p.Results.yEdge;
+
+            elseif strcmp(p.Results.normaliseY, 'yplus')
+                yplus = obj.wall_scale;
+                yEdge = yplus(i);
             elseif p.Results.normaliseY
                 yEdge = obj.yBL(i,j);
             else
@@ -1439,7 +1461,7 @@ classdef aveSlice < kCut
             ctau = obj.ctau;
             [~, inds] = max(ctau,[],2);
             value(isnan(inds)) = NaN;
-            for i=find(~isnan(inds))
+            for i=find(~isnan(inds))'
                 value(i) = obj.yBL(i,inds(i));
             end
             value = obj.smooth_dist(value);
@@ -1474,6 +1496,12 @@ classdef aveSlice < kCut
 
         end
 
+        function value = get.Uplus(obj)
+
+            value = obj.U./obj.u_tau;
+
+        end
+
         function value = get.u_tau(obj)
 
             ronow = obj.oGridProp('ro');
@@ -1487,6 +1515,10 @@ classdef aveSlice < kCut
             nunow = obj.oGridProp('nu');
             nunow = nunow(:,2);
             value = nunow./obj.u_tau;
+        end
+
+        function value = get.first_cell_height(obj)
+            value = obj.yBL(:,2);
         end
 
         function [xplus,yplus,zplus] = wall_coords_offset(obj)
@@ -1857,7 +1889,7 @@ classdef aveSlice < kCut
 
                     h0in = obj.mass_average_inlet('h0', 20);
                     hin = obj.mass_average_inlet('h', 20);
-                    sin = obj.mass_average_inlet('s', 50);
+                    sin = obj.mass_average_inlet('s', 20);
                     T2 = obj.mass_average_outlet('T', i);
                     scale = T2/(h0in-hin);
 
@@ -1867,14 +1899,20 @@ classdef aveSlice < kCut
                     tmp = obj.flowAng;
                     scale=1;
                     offset=0;
-	    	case 'alpha_norm'
-		    tmp = obj.flowAng
-		    scale = 1;
-		    offset = obj.alpha2;
-	    
+	    	    case 'alpha_norm'
+		            tmp = obj.flowAngp;
+		            scale = 1;
+		            offset = obj.alpha2;
+                case 'soffset'
+                    tmp = obj.s;
+                    offset = obj.mass_average_inlet('s', 20);
+                    scale = 1;
+                otherwise
+                    tmp = obj.(prop);
+                    scale=1;
+                    offset=0;
             end
-        
-        
+
             for ib = obj.blk.outlet_blocks{1}
                 y = [y obj.blk.y{ib}(i,1:end-1)];
                 prof = [prof tmp{ib}(i,1:end-1)];
@@ -1886,8 +1924,7 @@ classdef aveSlice < kCut
             prof = prof(inds);
 
             yprof = (yprof-yprof(1))/(yprof(end)-yprof(1));
-
-            p = plot(yprof, prof, fmt)
+            p = plot(prof, yprof, fmt);
 
         end
 
@@ -1976,6 +2013,33 @@ classdef aveSlice < kCut
                 value = value + trapz(ynow, ru) - trapz(xnow, rv);
             end
 
+        end
+
+        function inds = get.bubble_edge_ind(obj)
+            Unow = obj.U;
+            inds(1:size(Unow,1)) = NaN;
+
+            for i=1:size(Unow,1)
+                
+                prof = Unow(i,:);
+                cross = prof(1:end-1).*prof(2:end);
+                cross(1) = 0;
+
+                js = find(cross<0);
+
+                if ~isempty(js)
+                    inds(i) = js(1);
+                end
+
+            end
+        end
+
+        function yedge = get.bubble_edge(obj)
+            inds = obj.bubble_edge_ind;
+            yedge(1:length(inds)) = NaN;
+            for i=find(~isnan(inds))
+                yedge(i) = obj.yBL(i,inds(i));
+            end
         end
 
         function value = get.p0out(obj)
@@ -2085,6 +2149,43 @@ classdef aveSlice < kCut
 
             
 
+        end
+
+        function value = get.tau_aligned_s(obj)
+            tau_aligned = obj.align_tensor_with_surface('tau_Re');
+            value = squeeze(tau_aligned(:,:,1,1));
+        end
+
+        function value = get.tau_aligned_n(obj)
+            tau_aligned = obj.align_tensor_with_surface('tau_Re');
+            value = squeeze(tau_aligned(:,:,2,2));
+        end
+
+        function value = get.tau_aligned_t(obj)
+            tau_aligned = obj.align_tensor_with_surface('tau_Re');
+            value = squeeze(tau_aligned(:,:,1,2)) ...
+                + squeeze(tau_aligned(:,:,2,1));
+        end
+
+        function value = get.tau_aligned_z(obj)
+            tau_aligned = obj.align_tensor_with_surface('tau_Re');
+            value = squeeze(tau_aligned(:,:,3,3));
+        end
+
+        function value = get.S_aligned_s(obj)
+            St_aligned = obj.align_tensor_with_surface('St');
+            value = squeeze(St_aligned(:,:,1,1));
+        end
+
+        function value = get.S_aligned_n(obj)
+            St_aligned = obj.align_tensor_with_surface('St');
+            value = squeeze(St_aligned(:,:,2,2));
+        end
+
+        function value = get.S_aligned_t(obj)
+            St_aligned = obj.align_tensor_with_surface('St');
+            value = squeeze(St_aligned(:,:,1,2)) ...
+                + squeeze(St_aligned(:,:,2,1));
         end
 
         function value = get.pr_aligned_s(obj)
@@ -2349,6 +2450,216 @@ classdef aveSlice < kCut
             sol.Pr = sol.ctau.*(1-sol.Us);
             sol.PrEq = sol.CtauEq.*(1-sol.Us);
 
-        end        
+        end
+
+        function nb = find_block(obj, x, y)
+            nb = [];
+            for ib=1:obj.NB
+
+                [xb, yb] = block_boundary(obj.blk, ib);
+                if inpolygon(x,y,xb,yb)
+                    nb = ib;
+                    break
+                end
+            end
+
+        end
+
+        function [x, y, value] = get_BL_streamline(obj, xseed, yseed, prop)
+
+            if nargin < 4 || isempty(prop)
+                int = false;
+            else
+                int = true;
+                prop = obj.oGridProp(prop);
+            end
+
+            value = [];
+                        
+            x = xseed; y = yseed;
+
+            xb = obj.xO;
+            yb = obj.yO;
+
+            xb = [xb(1:end-1,1); ...
+                xb(end,1:end-1)'; ...
+                xb(end:-1:2,end); ...
+                xb(1,end:-1:2)'];
+        
+            yb = [yb(1:end-1,1); ...
+                yb(end,1:end-1)'; ...
+                yb(end:-1:2,end); ...
+                yb(1,end:-1:2)'];
+
+
+            xin = obj.blk.x{obj.blk.inlet_blocks{1}(1)}(1,1);
+            xout = obj.blk.x{obj.blk.outlet_blocks{1}(1)}(end,1);
+            ds = (xout-xin)/250;
+
+            % March backwards
+            xv = reshape(obj.xO,[],1);
+            yv = reshape(obj.yO,[],1);
+
+            ui = scatteredInterpolant(xv, yv, reshape(obj.oGridProp('u'), [], 1));
+            vi = scatteredInterpolant(xv, yv, reshape(obj.oGridProp('v'), [], 1));
+            if int
+                pi = scatteredInterpolant(xv, yv, reshape(prop, [], 1));
+                value = [];
+            end
+
+            
+            while inpolygon(x(1), y(1), xb, yb)
+                u = ui(x(1), y(1));
+                v = vi(x(1), y(1));
+                s = sqrt(u^2 + v^2);
+
+                if int
+                    p = pi(x(1), y(1));
+                    value = [p value];
+                end
+
+                x = [-u*ds/s+x(1) x];
+                y = [-v*ds/s+y(1) y];
+            end
+
+            x = x(2:end);
+            y = y(2:end);
+            if int
+                value = value(1:end-1);
+            end
+
+            % March forwards                
+            while inpolygon(x(end), y(end), xb, yb)
+                u = ui(x(end), y(end));
+                v = vi(x(end), y(end));
+                s = sqrt(u^2 + v^2);
+
+                if int
+                    p = pi(x(end), y(end));
+                    value = [value p];
+                end
+
+                x = [x u*ds/s+x(end)];
+                y = [y v*ds/s+y(end)];
+            end
+
+            x = x(1:end-1);
+            y = y(1:end-1);
+
+        end
+
+        function [x, y, value] = get_streamline(obj,xseed,yseed, prop)
+
+            if nargin < 4 || isempty(prop)
+                int = false;
+            else
+                int = true;
+                prop = obj.(prop);
+            end
+
+            value = [];
+                        
+            x = xseed; y = yseed;
+            [xd, yd] = domain_boundary(obj.blk);
+
+            xin = obj.blk.x{obj.blk.inlet_blocks{1}(1)}(1,1);
+            xout = obj.blk.x{obj.blk.outlet_blocks{1}(1)}(end,1);
+            ds = (xout-xin)/2001;
+
+            % March backwards
+            [id, r] = in_domain(obj.blk, x(1), y(1), obj.blk.pitch);
+            y(1) = y(1) - r*obj.blk.pitch;
+            while id
+
+                nb = obj.find_block(x(1), y(1));
+                [xb, yb] = block_boundary(obj.blk, nb);
+
+                xv = reshape(obj.blk.x{nb},[],1);
+                yv = reshape(obj.blk.y{nb},[],1);
+
+                ui = scatteredInterpolant(xv, yv, reshape(obj.u{nb}, [], 1));
+                vi = scatteredInterpolant(xv, yv, reshape(obj.v{nb}, [], 1));
+                if int
+                    pi = scatteredInterpolant(xv, yv, reshape(prop{nb}, [], 1));
+                end
+
+                while inpolygon(x(1), y(1), xb, yb)
+                    u = ui(x(1), y(1));
+                    v = vi(x(1), y(1));
+                    s = sqrt(u^2 + v^2);
+
+                    if int
+                        p = pi(x(1), y(1));
+                        value = [p value];
+                    end
+
+                    x = [-u*ds/s+x(1) x];
+                    y = [-v*ds/s+y(1) y];
+                    r = [r(1) r];
+                end
+                [id, rn] = in_domain(obj.blk, x(1), y(1), obj.blk.pitch);
+                if id
+                    r(1) = r(1) + rn;
+                    y(1) = y(1) - rn*obj.blk.pitch;
+                end
+            end
+
+            x = x(2:end);
+            y = y(2:end);
+            r = r(2:end);
+            value = value(1:end-1);
+
+            % March forwards
+            [id, rn] = in_domain(obj.blk, x(end), y(end), obj.blk.pitch);
+            while id
+
+                nb = obj.find_block(x(end), y(end));
+                [xb, yb] = block_boundary(obj.blk, nb);
+
+                xv = reshape(obj.blk.x{nb},[],1);
+                yv = reshape(obj.blk.y{nb},[],1);
+
+                ui = scatteredInterpolant(xv, yv, reshape(obj.u{nb}, [], 1));
+                vi = scatteredInterpolant(xv, yv, reshape(obj.v{nb}, [], 1));
+                if int
+                    pi = scatteredInterpolant(xv, yv, reshape(prop{nb}, [], 1));
+                end
+                
+                while inpolygon(x(end), y(end), xb, yb)
+                    u = ui(x(end), y(end));
+                    v = vi(x(end), y(end));
+                    s = sqrt(u^2 + v^2);
+
+                    if int
+                        p = pi(x(end), y(end));
+                        value = [value p];
+                    end
+
+                    x = [x u*ds/s+x(end)];
+                    y = [y v*ds/s+y(end)];
+                    r = [r r(end)];
+                end
+                [id, rn] = in_domain(obj.blk, x(end), y(end), obj.blk.pitch);
+                if id
+                    r(end) = r(end) + rn;
+                    y(end) = y(end) - rn*obj.blk.pitch;
+                end
+            end
+
+            x = x(1:end-1);
+            y = y(1:end-1);
+            r = r(1:end-1);
+
+            y = y + r*obj.blk.pitch;
+        end
+
+        function plot_streamline(obj, xseed, yseed, fmt)
+            if nargin < 4 || isempty(fmt)
+                fmt = '';
+            end
+            [xs, ys] = obj.get_streamline(xseed, yseed);
+            plot(xs, ys, fmt)
+        end
+
     end
 end

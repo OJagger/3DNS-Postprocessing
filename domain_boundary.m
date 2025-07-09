@@ -54,8 +54,6 @@ end
 
 function p = get_bnd_patch(blk, ib)
 
-
-
     p = [];
     if blk.next_block{ib}.im == 0
         p = [p, "im"];

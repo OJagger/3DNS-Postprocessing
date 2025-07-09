@@ -51,6 +51,57 @@ classdef DNS_channel < DNS_case
             obj.nbj = obj.NB/obj.nbi;
         end
 
+        function regions = getIntRegions(obj, iplot)
+
+            if nargin < 2
+                iplot = false;
+            end
+
+            xrangePreShock = [0.1 0.45];
+            xrangePostShock = [0.55 0.9];
+    
+            regions = {};
+            [regions{1}.is, ~, regions{1}.nb] = find_ij(obj, xrangePreShock(1), 0);
+            % [~, regions{1}.is] = min(abs(obj.blk.x{1}(:,1) - xrangePreShock(1)));
+            [~, regions{1}.ie] = min(abs(obj.blk.x{1}(:,1) - xrangePreShock(2)));
+            regions{1}.js = 1;
+            % regions{1}.je = 192;
+            regions{1}.label = "Pre-shock";
+    
+            [i, ~, nbnow] = find_ij(obj, xrangePostShock(1), 0);
+            [regions{2}.is, regions{2}.je, regions{2}.nb] = find_ij(obj, xrangePostShock(1), obj.blk.y{nbnow}(i, end)/2);
+            % [~, regions{2}.is] = min(abs(obj.blk.x{1}(:,1) - xrangePostShock(1)));
+            [~, regions{2}.ie] = min(abs(obj.blk.x{nbnow}(:,1) - xrangePostShock(2)));
+            regions{2}.js = 1;
+            regions{1}.je = regions{2}.je;
+            
+            
+            
+            % regions{2}.je =  192;
+            regions{2}.label = "Post-shock";
+
+            if iplot
+                ax = gca;
+                obj.kPlot(obj.meanFlow, 'diss','ax',ax,'label','$\phi$');
+                hold on
+                p = [];
+                for ir = 1:length(regions)
+                    nb = regions{ir}.nb;
+                    irange = regions{ir}.is:regions{ir}.ie;
+                    jrange = regions{ir}.js:regions{ir}.je;
+                    xline = [obj.blk.x{nb}(irange,jrange(1))' obj.blk.x{nb}(irange(end),jrange(2:end)) ...
+                        obj.blk.x{nb}(irange(end-1:-1:1),jrange(end))' obj.blk.x{nb}(irange(1), jrange(end-1:-1:1))];
+                    yline = [obj.blk.y{nb}(irange,jrange(1))' obj.blk.y{nb}(irange(end),jrange(2:end)) ...
+                        obj.blk.y{nb}(irange(end-1:-1:1),jrange(end))' obj.blk.y{nb}(irange(1), jrange(end-1:-1:1))];
+                    p(ir) = plot(ax, xline, yline, 'LineWidth', 1.5);
+                    labels{ir} = regions{ir}.label;
+                end
+                legend(p,[labels{:}]);
+            end
+
+
+        end
+
         function split_domain(obj, newCase)
             newFlow = volFlow();
             newFlow.flowpath = newCase.casepath;

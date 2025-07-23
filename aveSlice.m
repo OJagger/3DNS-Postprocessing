@@ -225,15 +225,7 @@ classdef aveSlice < kCut
             disp('Calculating surface p')
             pnow = obj.oGridProp('p');
             value = pnow(:,1);
-        end
-
-        function value = BLedgeIndOGrid(obj)
-            v = obj.BLedgeInd;
-            for i=1:length(v)
-                value(i) = obj.jO(i,v(i));
-            end
-        end
-       
+        end       
 
         function value = BLedgeInd(obj, mode, debug)
             if nargin < 2 || isempty(mode)

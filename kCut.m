@@ -288,6 +288,11 @@ classdef kCut < flowSlice
             value = cell(1,obj.NB);
             v = obj.(prop);
             if size(v,2) == 1 || size(v,1) == 1
+
+                if any(contains(prop, ["Ind", "ind"]))
+                    v = rowwise_slice(obj.jO, v);
+                end
+
                 for i=1:length(v)
                     value{obj.blkO(i,1)}(obj.iO(i,1)) = v(i);
                 end

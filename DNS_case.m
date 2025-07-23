@@ -752,6 +752,10 @@ classdef DNS_case < handle
                 path = obj.casepath;
             end
             f = fopen(fullfile(path, 'probe.txt'), 'w');
+            if isempty(obj.nSkip)
+                disp('nSkip not set: setting to default value (20)');
+                obj.nSkip = 20;
+            end
 
             fprintf(f,'%d %d\n',[obj.nProbes obj.nSkip]);
             for ip = 1:obj.nProbes

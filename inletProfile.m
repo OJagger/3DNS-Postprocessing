@@ -201,9 +201,14 @@ classdef inletProfile < handle
 
             p = inputParser;
 
-            q = obj.(prop);
+	    if ischar(prop)
+                q = obj.(prop);
+            else
+                q = prop;
+            end
 
-            addRequired(p, 'prop', @ischar);
+
+%            addRequired(p, 'prop');
             addParameter(p, 'ax', defaultAx);
             addParameter(p, 'yEdge', defaultEdgeY);
             addParameter(p, 'normalise', false);
@@ -212,7 +217,7 @@ classdef inletProfile < handle
             addParameter(p, 'LineWidth', defaultLineWidth);
             addParameter(p, 'normaliseY', true);
 
-            parse(p, prop, varargin{:});  
+            parse(p, varargin{:});  
 
             if ~isempty(p.Results.yEdge)
                 yEdge = p.Results.yEdge;

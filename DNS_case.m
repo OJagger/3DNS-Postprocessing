@@ -679,7 +679,7 @@ classdef DNS_case < handle
                 blkData.k = temp(4);
                 blkData.x = obj.blk.x{blkData.nb}(blkData.i,blkData.j);
                 blkData.y = obj.blk.y{blkData.nb}(blkData.i,blkData.j);
-                probes{nProbe} = dnsProbe(path, nProbe, nSkip, blkData, obj.gas);
+                probes{nProbe} = dnsProbe(path, nProbe, nSkip, blkData, obj.gas, obj.casetype);
             end
             fclose(f);
         end
@@ -695,7 +695,7 @@ classdef DNS_case < handle
             end
             blkData.x = obj.blk.x{blkData.nb}(blkData.i,blkData.j);
             blkData.y = obj.blk.y{blkData.nb}(blkData.i,blkData.j);
-            obj.probes{end+1} = dnsProbe([], obj.nProbes+1, obj.nSkip, blkData, obj.gas);
+            obj.probes{end+1} = dnsProbe([], obj.nProbes+1, obj.nSkip, blkData, obj.gas, obj.casetype);
             
             if isempty(obj.nProbes)
                 obj.nProbes = 1;
@@ -712,7 +712,7 @@ classdef DNS_case < handle
                 blkData.k = newProbes{i}.k;
                 blkData.x = obj.blk.x{blkData.nb}(blkData.i,blkData.j);
                 blkData.y = obj.blk.y{blkData.nb}(blkData.i,blkData.j);
-                obj.probes{end+1} = dnsProbe([], obj.nProbes+1, obj.nSkip, blkData, obj.gas);
+                obj.probes{end+1} = dnsProbe([], obj.nProbes+1, obj.nSkip, blkData, obj.gas, obj.casetype);
             end
             if isempty(obj.nProbes)
                 obj.nProbes = length(newProbes);
@@ -2644,7 +2644,7 @@ classdef DNS_case < handle
                 blkData.k = ceil(obj.solver.nk/2);
                 blkData.x = obj.blk.x{oldProbes{ip}.nb}(i,j);
                 blkData.y = obj.blk.y{oldProbes{ip}.nb}(i,j);
-                newProbes{ip} = dnsProbe([],ip,obj.nSkip,blkData,obj.gas);
+                newProbes{ip} = dnsProbe([],ip,obj.nSkip,blkData,obj.gas, obj.casetype);
             end
         end
 

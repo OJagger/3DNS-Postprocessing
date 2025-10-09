@@ -29,7 +29,7 @@ classdef dnsProbe < handle
     end
 
     methods
-        function obj = dnsProbe(rundir, nProbe, nSkip, blkData, gas)
+        function obj = dnsProbe(rundir, nProbe, nSkip, blkData, gas, casetype)
             obj.nSkip = nSkip;
             obj.x = blkData.x;
             obj.y = blkData.y;
@@ -42,7 +42,14 @@ classdef dnsProbe < handle
             if ~isempty(rundir)
                 try
                     fid = fopen(fullfile(rundir,['probe_' num2str(nProbe)]),'r');
-                    A = fscanf(fid, '%f %f %f %f %f %f', [6 inf]);
+                    switch casetype
+                        case 'cpu'
+                            A = fscanf(fid, '%f %f %f %f %f %f', [6 inf]);
+
+                        case 'gpu'
+                            A = fread(nodfile,inf,'uint32');
+                            A = reshape(A,6,length(B)/6);
+                    end
                     fclose(fid);
                     
                     obj.t = A(1,:);

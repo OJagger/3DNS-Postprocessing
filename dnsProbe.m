@@ -47,8 +47,8 @@ classdef dnsProbe < handle
                             A = fscanf(fid, '%f %f %f %f %f %f', [6 inf]);
 
                         case 'gpu'
-                            A = fread(nodfile,inf,'uint32');
-                            A = reshape(A,6,length(B)/6);
+                            A = fread(fid,inf,'float64');
+                            A = reshape(A,6,length(A)/6);
                     end
                     fclose(fid);
                     
@@ -103,8 +103,12 @@ classdef dnsProbe < handle
 
         end
 
-        function value = plot_spectrum(obj,ax,plot_inertial)
-            if nargin < 3
+        function value = plot_spectrum(obj,ax,plot_inertial, fmt)
+
+            if nargin < 4 || isempty(fmt)
+                fmt = [];
+            end 
+            if nargin < 3 || isempty(plot_inertial)
                 plot_inertial = false;
             end
             
@@ -146,7 +150,7 @@ classdef dnsProbe < handle
 %             psd = P1/fs;
 %             f = fs*(0:(N/2))/N;
 % 
-            value = loglog(F_psd, PSD);
+            value = loglog(F_psd, PSD, fmt);
             if plot_inertial
                 B = 50000; % B is a fudge to adjust the y intercept
                 fit_wp = logspace(log10(min(F_psd(2:end))),6,100);

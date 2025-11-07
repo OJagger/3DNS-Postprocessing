@@ -48,6 +48,7 @@ classdef aveSlice < kCut
         Res;            % Surface distance Reynolds No
         Pr_nondim;
         blPr;           % Componant of cd due to production of tke
+        % blPr2;          % blPr from stress and strain tensors
         blPr_dimensional;
         blPr_eq;        % Coles' equilibrium prodution
         cPr;            % Non-dimensional local production
@@ -88,6 +89,10 @@ classdef aveSlice < kCut
         tau_aligned_n;
         tau_aligned_t;
         tau_aligned_z;
+        ctau_aligned_s;
+        ctau_aligned_n;
+        ctau_aligned_t;
+        ctau_aligned_z;
         S_aligned_s;
         S_aligned_n;
         S_aligned_t;
@@ -736,7 +741,7 @@ classdef aveSlice < kCut
         end
 
         function value = thickness2ind(obj, del)
-            y = obj.yO;
+            y = obj.yBL;
 
             if length(del) ~= size(y, 1)
                 value = [];
@@ -1282,6 +1287,27 @@ classdef aveSlice < kCut
             value = obj.smooth_dist(value);
         end
 
+        function value = blPr2(obj, prop)
+
+            inds = obj.BLedgeInd;
+            if nargin < 2
+                Prnow = obj.oGridProp('Pr2');
+            else
+                Prnow = obj.oGridProp(prop);
+            end
+            ronow = obj.oGridProp('ro');
+            Unow = obj.U;
+            value(isnan(inds)) = NaN;
+            for i=find(~isnan(inds))
+                Prprof = Prnow(i,1:inds(i));
+                Ue = Unow(i,inds(i));
+                roe = ronow(i, inds(i));
+                ys = obj.yBL(i,1:inds(i));
+                value(i) = trapz(ys, Prprof)/(roe*Ue^3);
+            end
+            value = obj.smooth_dist(value);
+        end
+
         function value = get.blPr_dimensional(obj)
 %             inds = obj.BLedgeInd;
 %             Prnow = obj.oGridProp('Pr');
@@ -1464,7 +1490,12 @@ classdef aveSlice < kCut
             [~, value] = max(ctau,[],2);
         end
 
-                
+        function value = BL_max(obj, prop)
+
+            field = abs(obj.oGridProp(prop));
+            value = max(field,[],2);
+
+        end                
 
         function value = get.pdyn(obj)
             inds = obj.BLedgeInd;
@@ -2161,6 +2192,28 @@ classdef aveSlice < kCut
 
         function value = get.tau_aligned_z(obj)
             tau_aligned = obj.align_tensor_with_surface('tau_Re');
+            value = squeeze(tau_aligned(:,:,3,3));
+        end
+
+        function value = get.ctau_aligned_s(obj)
+            tau_aligned = obj.align_tensor_with_surface('ctau_Re');
+            value = squeeze(tau_aligned(:,:,1,1));
+        end
+
+        function value = get.ctau_aligned_n(obj)
+            tau_aligned = obj.align_tensor_with_surface('ctau_Re');
+            value = squeeze(tau_aligned(:,:,2,2));
+        end
+
+        function value = get.ctau_aligned_t(obj)
+            disp('here')
+            tau_aligned = obj.align_tensor_with_surface('ctau_Re');
+            value = squeeze(tau_aligned(:,:,1,2)) ...
+                + squeeze(tau_aligned(:,:,2,1));
+        end
+
+        function value = get.ctau_aligned_z(obj)
+            tau_aligned = obj.align_tensor_with_surface('ctau_Re');
             value = squeeze(tau_aligned(:,:,3,3));
         end
 

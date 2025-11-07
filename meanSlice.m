@@ -43,11 +43,18 @@ classdef meanSlice < aveSlice
         tau_Re_an;          % Anisotropic componant of Re stress tensor
         tau_an_mag;         % Magnitude of anisotropic componant of Re stress
         tau_Re_an_mag;      
-        tau_Re_Boussinesq;  % Reynolds stress tensor calculated with 
+        tau_Re_Boussinesq;  % Reynolds stress tensor calculated with
+        tau_error;          % Reynolds stress error using Boussinesq approximation
+        ctau_Re;
         omega_opt;
         omega_opt_cleaned;
         Rij;
         tau_Re_mag;     % RijSij / sqrt(SijSij)
+        Pr_mut_opt;
+        blPr_mut_opt;
+        Pr2;
+        Pr_an;
+        Pr_iso;
     end
 
     methods
@@ -406,30 +413,6 @@ classdef meanSlice < aveSlice
             tau = obj.tau_Re_an;
             for ib = 1:obj.NB
 
-%                 [DUDX,DUDY] = gradHO(obj.blk.x{ib},obj.blk.y{ib},obj.u{ib});
-%                 [DVDX,DVDY] = gradHO(obj.blk.x{ib},obj.blk.y{ib},obj.v{ib});
-
-                
-%                 S = zeros(obj.blk.blockdims(ib,1),obj.blk.blockdims(ib,2),3,3);
-%                 tau = S;
-%                 
-%                 S(:,:,1,1) = 2*DUDX/3 - DVDY/3;
-%                 S(:,:,2,2) = 2*DVDY/3 - DUDX/3;
-%                 S(:,:,3,3) = -(DUDX+DVDY)/3;
-% 
-%                 S(:,:,1,2) = 0.5*(DUDY+DVDX);
-%                 S(:,:,2,1) = S(:,:,1,2);
-
-                % Traceless strain magnitude
-%                 St = sqrt(sum(sum(S.*S,4),3));
-                
-%                 tau(:,:,1,1) = -2*obj.roUddUdd{ib}/3 + obj.roVddVdd{ib}/3 + obj.roWddWdd{ib}/3;
-%                 tau(:,:,2,2) = -2*obj.roVddVdd{ib}/3 + obj.roUddWdd{ib}/3 + obj.roUddWdd{ib}/3;
-%                 tau(:,:,3,3) = -2*obj.roWddWdd{ib}/3 + obj.roUddUdd{ib}/3 + obj.roVddVdd{ib}/3;
-% 
-%                 tau(:,:,1,2) = -obj.roUddVdd{ib};
-%                 tau(:,:,2,1) = tau(:,:,1,2);
-
                 num = sum(sum(tau{ib}.*S{ib},4),3);
                 den = sum(sum(S{ib}.*S{ib},4),3);
                 mask = obj.k{ib} < 10;
@@ -449,6 +432,136 @@ classdef meanSlice < aveSlice
             mu = obj.mu;
             for ib = 1:obj.NB
                 value{ib} = mut{ib}./mu{ib};
+            end
+        end
+
+        function value = get.Pr2(obj)
+
+            tauij = obj.tau_Re;
+            vgrad = obj.duidxj;
+
+            for nb = 1:obj.NB
+                value{nb} = sum(sum(vgrad{nb}.*tauij{nb}, 4), 3);
+            end
+        end
+
+        function value = get.Pr_an(obj)
+
+            tauij = obj.tau_Re;
+            vgrad = obj.St_an;
+
+            for nb = 1:obj.NB
+                value{nb} = sum(sum(vgrad{nb}.*tauij{nb}, 4), 3);
+            end
+        end
+
+        function value = get.Pr_iso(obj)
+
+            tauij = obj.tau_Re;
+            vgrad = obj.St_iso;
+
+            for nb = 1:obj.NB
+                value{nb} = sum(sum(vgrad{nb}.*tauij{nb}, 4), 3);
+            end
+        end
+
+        function value = get.tau_error(obj)
+            mto = obj.mut_opt;
+            tau = obj.tau_Re_an;
+            s = obj.St_an;
+
+            for ib = 1:obj.NB
+                eps = tau{ib} - 2 * mto{ib}.*s{ib};
+                value{ib} = sqrt( sum( sum( eps.*eps, 4), 3));
+            end
+        end
+
+        function value = get.Pr_mut_opt(obj)
+    
+            mto = obj.mut_opt;
+            vgrad = obj.duidxj;
+            munow = obj.mu;
+            St_an_now = obj.St_an;
+            deltaij(1,1,:,:) = [1 0 0; 0 1 0; 0 0 1];
+
+            for nb = 1:obj.NB
+                tauij = 2*mto{nb}.*St_an_now{nb} - (2/3)*(obj.ro{nb}.*obj.k{nb}).*deltaij;
+                value{nb} = sum(sum(vgrad{nb}.*tauij, 4), 3);
+            end
+
+        end
+
+        function value = get.blPr_mut_opt(obj)
+
+            inds = obj.BLedgeInd;
+            Prnow = obj.oGridProp('Pr_mut_opt');
+            ronow = obj.oGridProp('ro');
+            Unow = obj.U;
+            value(isnan(inds)) = NaN;
+            for i=find(~isnan(inds)) %1:size(obj.yBL,1)
+                if i==476
+                    disp('')
+                end
+                Prprof = Prnow(i,1:inds(i));
+                Ue = Unow(i,inds(i));
+                roe = ronow(i, inds(i));
+                ys = obj.yBL(i,1:inds(i));
+                value(i) = trapz(ys, Prprof)/(roe*Ue^3);
+            end
+            value = obj.smooth_dist(value);
+        end
+
+        function value = get.tau_Re_an(obj)
+
+            tau_Re = obj.tau_Re;
+
+            for ib = 1:obj.NB
+
+                tr = tau_Re{ib}(:,:,1,1) + tau_Re{ib}(:,:,2,2) + tau_Re{ib}(:,:,3,3);
+
+                tau = tau_Re{ib};
+                for i = 1:3
+                    tau(:,:,i,i) = tau(:,:,i,i) - tr/3;
+                end
+
+                value{ib} = tau;
+
+            end
+        end
+
+        function value = get.tau_Re_an_mag(obj)
+
+            tau = obj.tau_Re_an;
+            for ib = 1:obj.NB
+                value{ib} = sqrt(sum(sum(tau{ib}.*tau{ib},4),3));
+            end
+
+        end
+
+        function value = get.Rij(obj)
+
+            tau = obj.tau_Re;
+            ro = obj.ro;
+
+            for ib = 1:obj.NB
+
+                % tau = zeros(obj.blk.blockdims(ib,1),obj.blk.blockdims(ib,2),3,3);
+                % 
+                % tau(:,:,1,1) = obj.roUddUdd{ib};
+                % tau(:,:,2,2) = obj.roVddVdd{ib};
+                % tau(:,:,3,3) = obj.roWddWdd{ib};
+                % 
+                % tau(:,:,1,2) = obj.roUddVdd{ib};
+                % tau(:,:,2,1) = tau(:,:,1,2);
+                % 
+                % tau(:,:,1,3) = obj.roUddWdd{ib};
+                % tau(:,:,3,1) = tau(:,:,1,3);
+                % 
+                % tau(:,:,2,3) = obj.roVddWdd{ib};
+                % tau(:,:,3,2) = tau(:,:,2,3);
+
+                value{ib} = -tau{ib} ./ ro{ib};
+
             end
         end
 
@@ -475,67 +588,13 @@ classdef meanSlice < aveSlice
             end
         end
 
-        function value = get.tau_Re_an(obj)
+        function value = get.ctau_Re(obj)
 
-            tau_Re = obj.tau_Re;
+            roe = obj.edge_prop('ro');
+            Uenow = obj.Ue;
+            tau = obj.oGridProp('tau_Re');
 
-            for ib = 1:obj.NB
-
-                tr = tau_Re{ib}(:,:,1,1) + tau_Re{ib}(:,:,2,2) + tau_Re{ib}(:,:,3,3);
-
-                tau = tau_Re{ib};
-                for i = 1:3
-                    tau(:,:,i,i) = tau(:,:,i,i) - tr/3;
-                end
-
-                value{ib} = tau;
-
-
-%                 tau = zeros(obj.blk.blockdims(ib,1),obj.blk.blockdims(ib,2),3,3);
-%                 
-%                 tau(:,:,1,1) = -2*obj.roUddUdd{ib}/3 + obj.roVddVdd{ib}/3 + obj.roWddWdd{ib}/3;
-%                 tau(:,:,2,2) = -2*obj.roVddVdd{ib}/3 + obj.roUddUdd{ib}/3 + obj.roWddWdd{ib}/3;
-%                 tau(:,:,3,3) = -2*obj.roWddWdd{ib}/3 + obj.roUddUdd{ib}/3 + obj.roVddVdd{ib}/3;
-% 
-%                 tau(:,:,1,2) = -obj.roUddVdd{ib};
-%                 tau(:,:,2,1) = tau(:,:,1,2);
-% 
-%                 value{ib} = sum(sum(abs(tau.*Snow{ib}),4),3);
-            end
-        end
-
-        function value = get.tau_Re_an_mag(obj)
-
-            tau = obj.tau_Re_an;
-            for ib = 1:obj.NB
-                value{ib} = sqrt(sum(sum(tau{ib}.*tau{ib},4),3));
-            end
-
-        end
-
-        function value = get.Rij(obj)
-            for ib = 1:obj.NB
-
-
-                tau = zeros(obj.blk.blockdims(ib,1),obj.blk.blockdims(ib,2),3,3);
-                
-                tau(:,:,1,1) = obj.roUddUdd{ib};
-                tau(:,:,2,2) = obj.roVddVdd{ib};
-                tau(:,:,3,3) = obj.roWddWdd{ib};
-
-                tau(:,:,1,2) = obj.roUddVdd{ib};
-                tau(:,:,2,1) = tau(:,:,1,2);
-
-
-                tau(:,:,1,3) = obj.roUddWdd{ib};
-                tau(:,:,3,1) = tau(:,:,1,3);
-
-
-                tau(:,:,2,3) = obj.roVddWdd{ib};
-                tau(:,:,3,2) = tau(:,:,2,3);
-
-                value{ib} = tau ./ obj.ro{ib};
-            end
+            value = -tau./(roe.*Uenow.^2);
         end
 
         function value = get.tau_Re_mag(obj)

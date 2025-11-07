@@ -17,6 +17,7 @@ classdef DNS_case < handle
         % x;
         % y;
         nSlices;
+        nStatsSlices
         nProbes;
         nSkip;
         probes;
@@ -34,8 +35,10 @@ classdef DNS_case < handle
         iSlices;
         jSlices = jSlice.empty;
         kSlices = kSlice.empty;
+        kStats = kStatsSlice.empty;
         inflowTurb = volTurbulence.empty;
-        spanAveFlow = kSlice.empty
+        spanAveFlow = kSlice.empty;
+        deltaFlow = kSlice.empty;
         inletProf = inletProfile.empty;
         RANSSlices;
         trip;
@@ -380,6 +383,101 @@ classdef DNS_case < handle
             
         end
 
+        function readKStats(obj, slicenums, runs)
+            %READKSLICES Read in instantaneous k slices
+            % Optional: numslices - only read last n slices if there are many
+            
+            exist("runs",'var')
+            exist("numslices",'var')
+            obj.kStats = kStatsSlice.empty;
+            obj.nStatsSlices = 0;
+            if nargin < 3 || isempty(runs)
+                runs = obj.run;
+            end
+            paths2read={};
+            slicenums2read=[];
+            time2read = [];
+            if isempty(runs)
+                ishere = true;
+                switch obj.casetype
+                    case 'cpu'
+                        % slicetime = readmatrix(fullfile(obj.runpath,'slice_time.txt'));
+                        % slices = dir(fullfile(obj.runpath,'kcu2_1_*'));
+                    case 'gpu'
+                        slicetime = readmatrix(fullfile(obj.runpath,'kstats_time.txt'));
+                        slices = dir(fullfile(obj.runpath,'kbar_1_*'));
+                end
+                for i=1:length(slices)
+                        inds(i) = str2num(slices(i).name(8:end));
+                end
+                [~,inds] = sort(inds);
+                slices = slices(inds);
+                for i=1:length(slices)
+                    slicenum = str2num(slices(i).name(8:end));
+                    slicenums2read(end+1) = slicenum;
+                    paths2read{i} = obj.runpath;
+                    for j=1:size(slicetime,1)
+                        if slicetime(j,1) == slicenum
+                            time2read(end+1) = slicetime(j,2);
+                        end
+                    end
+                end
+
+            else
+                ishere=false;
+                for run=runs
+                    runpath = fullfile(obj.casepath,['run' num2str(run)]);
+                    switch obj.casetype
+                        case 'cpu'
+                            % slicetime = readmatrix(fullfile(runpath,'slice_time.txt'));
+                            % slices = dir(fullfile(runpath,'k_cuts','kcu2_1_*'));
+                        case 'gpu'
+                            slicetime = readmatrix(fullfile(runpath,'kstats_time.txt'));
+                            slices = dir(fullfile(runpath,'k_cuts','kbar_1_*'));
+                    end
+                    
+                    %obj.nSlices = obj.nSlices + length(slices);
+                    inds = [];
+                    for i=1:length(slices)
+                        inds(i) = str2num(slices(i).name(8:end));
+                    end
+                    [~,inds] = sort(inds);
+                    slices = slices(inds);
+                    for i=1:length(slices)
+                        paths2read{end+1} = runpath;
+                        slicenum = str2num(slices(i).name(8:end));
+                        slicenums2read(end+1) = slicenum;
+                        for j=1:size(slicetime,1)
+                            if slicetime(j,1) == slicenum
+                                time2read(end+1) = slicetime(j,2);
+                            end
+                        end
+                    end
+                end
+            end
+
+            if exist("slicenums",'var')
+                if length(slicenums) == 1
+                    slicenums2read = slicenums2read(end-slicenums+1:end);
+                    paths2read = paths2read(end-slicenums+1:end);
+                    time2read = time2read(end-slicenums+1:end);
+                else
+                    slicenums2read = slicenums2read(slicenums);
+                    paths2read = paths2read(slicenums);
+                    time2read = time2read(slicenums);
+                end
+            end
+
+            obj.nStatsSlices = length(slicenums2read);
+
+            for i=1:obj.nStatsSlices
+                fprintf('Reading slice %d/%d\n',[i obj.nStatsSlices])
+                obj.kStats(i) = kStatsSlice(obj.blk,obj.gas,obj.bcs,paths2read{i},slicenums2read(i),time2read(i),obj.casetype,ishere);
+                %slices(i).time = slicetime(i,2);
+            end
+            
+        end
+
         function readJSlices(obj, slicenums, runs)
             %READKSLICES Read in instantaneous j slices
             % Optional: numslices - only read last n slices if there are many
@@ -510,10 +608,17 @@ classdef DNS_case < handle
 %                 temp = fgetl(fid);
             fclose(fid);
             temp = str2num(temp);
-            nMeanEnd = temp(1)
+            nMeanEnd = temp(1);
 
-            obj.startFlow = spanAveSlice(obj.runpaths{1},obj.blk,obj.gas,obj.bcs,obj.casetype,nMeanStart);
-            obj.endFlow = spanAveSlice(obj.runpaths{end},obj.blk,obj.gas,obj.bcs,obj.casetype,nMeanEnd);
+            obj.startFlow = spanAveSlice(obj.blk,obj.gas,obj.bcs,obj.runpaths{1},obj.casetype,nMeanStart);
+            obj.endFlow = spanAveSlice(obj.blk,obj.gas,obj.bcs,obj.runpaths{end},obj.casetype,nMeanEnd);
+            obj.deltaFlow = spanAveSlice(obj.blk,obj.gas,obj.bcs);
+            for prop = ["ro","u","v","w","Et","ros_store"]
+                obj.deltaFlow.(prop) = {};
+                for ib = 1:obj.NB
+                    obj.deltaFlow.(prop){ib} = obj.endFlow.(prop){ib} - obj.startFlow.(prop){ib};
+                end
+            end
 
         end
 
@@ -1765,13 +1870,30 @@ classdef DNS_case < handle
             obj.RANSSlices{turb.mod} = RANSSlice(ransdir,data,obj.blk,obj.gas);
         end
 
-        function [e_unst, e_conv, e_diss, e_irrev, e_rev, e_n] = entropy_budget(obj, normalise)
+        function values = entropy_budget(obj, regions, iplot, normalise)
 
-            if nargin < 2
-                normalise = false;
+            if isempty(obj.startFlow) || isempty(obj.endFlow)
+                obj.readStartEndFlow;
             end
 
-            regions = obj.getIntRegions;
+            if isempty(obj.meanFlow)
+                obj.readMeanFlows;
+            end
+
+            if nargin < 2 || isempty(regions)
+                regions = obj.getIntRegions;
+            end
+            if ~iscell(regions)
+                regions = {regions};
+            end
+            if nargin < 3 || isempty(iplot)
+                iplot = true;
+            end
+            if nargin < 4 || isempty(normalise)
+                normalise = false;
+            end
+            
+
             e_unst = (obj.area_integral(obj.endFlow.ros, regions) - ...
                 obj.area_integral(obj.startFlow.ros, regions))/obj.meanFlow.meanTime;
 
@@ -1790,6 +1912,7 @@ classdef DNS_case < handle
             e_irrev = obj.area_integral(obj.meanFlow.irrev_gen, regions);
             e_rev = obj.area_integral(rev_prop, regions);
             e_n = (e_conv + e_unst) - (e_diss + e_irrev + e_rev);
+            
 
             if normalise
                 for i=1:length(regions)
@@ -1801,7 +1924,7 @@ classdef DNS_case < handle
                     e_n(i) = e_n(i)/abs(e_conv(i));
                 end
             else
-                factor = abs(e_diss(1));
+                factor = 1; %abs(e_diss(1));
                 for i=1:length(regions)
                     e_unst(i) = e_unst(i)/factor;
                     e_conv(i) = e_conv(i)/factor;
@@ -1812,33 +1935,46 @@ classdef DNS_case < handle
                 end
             end
 
-            groupLabels = {};
+            values = {};
             for ir = 1:length(regions)
-                stackData(ir, 1, 1) = e_conv(ir);
-                stackData(ir, 1, 2) = e_unst(ir);
-                stackData(ir, 1, 3:5) = 0;
-            
-                stackData(ir, 2, 1:2) = 0;
-                stackData(ir, 2, 3) = e_diss(ir);
-                stackData(ir, 2, 4) = e_irrev(ir);
-                stackData(ir, 2, 5) = e_rev(ir);
-                groupLabels{ir} = regions{ir}.label;
+                values{ir}.e_unst = e_unst(ir);
+                values{ir}.e_conv = e_conv(ir);
+                values{ir}.e_diss = e_diss(ir);
+                values{ir}.e_irrev = e_irrev(ir);
+                values{ir}.e_rev = e_rev(ir);
+                values{ir}.e_n = e_n(ir);
+                values{ir}.label = regions{ir}.label;
             end
             
-            h = plotBarStackGroups(stackData, groupLabels);
-            c = colororder;
-            c = c(1:5,:);
-            c = repelem(c,size(h,1),1); 
-            c = mat2cell(c,ones(size(c,1),1),3);
-            set(h,{'FaceColor'},c);
-            legend(h(1,:),'\epsilon_S','\epsilon_{unst}','\epsilon_\phi','\epsilon_{irrev}','\epsilon_{rev}','Location','northeast')
-            set(gca,'FontSize',12)
-            if normalise
-                ylabel('\epsilon/|\epsilon_\Phi|')
-            else
-                ylabel('\epsilon/|\epsilon_{\Phi, Pre-Shock}|')
+            if iplot
+                groupLabels = {};
+                for ir = 1:length(regions)
+                    stackData(ir, 1, 1) = e_conv(ir);
+                    stackData(ir, 1, 2) = e_unst(ir);
+                    stackData(ir, 1, 3:5) = 0;
+                
+                    stackData(ir, 2, 1:2) = 0;
+                    stackData(ir, 2, 3) = e_diss(ir);
+                    stackData(ir, 2, 4) = e_irrev(ir);
+                    stackData(ir, 2, 5) = e_rev(ir);
+                    groupLabels{ir} = regions{ir}.label;
+                end
+                
+                h = plotBarStackGroups(stackData, groupLabels);
+                c = colororder;
+                c = c(1:5,:);
+                c = repelem(c,size(h,1),1); 
+                c = mat2cell(c,ones(size(c,1),1),3);
+                set(h,{'FaceColor'},c);
+                legend(h(1,:),'\epsilon_S','\epsilon_{unst}','\epsilon_\phi','\epsilon_{irrev}','\epsilon_{rev}','Location','northeast')
+                set(gca,'FontSize',12)
+                if normalise
+                    ylabel('\epsilon/|\epsilon_\Phi|')
+                else
+                    ylabel('\epsilon/|\epsilon_{\Phi, Pre-Shock}|')
+                end
+                set(gca, 'XTickLabelRotation',20)
             end
-            set(gca, 'XTickLabelRotation',20)
         end
 
 %         function [e_s, e_phi, e_irrev, e_N] = entropy_balance(obj)
@@ -1938,35 +2074,82 @@ classdef DNS_case < handle
 
         end
 
+        function value = area_integral_masked(obj, prop, regions)
+            value = [];
+            if ~iscell(regions)
+                regions = {regions};
+            end
+            for r = [regions{:}]
+                value(end+1) = 0;
+                for ib = 1:obj.NB
+
+                    [ni,nj] = size(obj.blk.x{ib});
+                        
+                    im = 1:ni-1;
+                    ip = 2:ni;
+                    jm = 1:nj-1;
+                    jp = 2:nj;
+                    
+                    x1 = obj.blk.x{ib}(im,jm);
+                    x2 = obj.blk.x{ib}(ip,jm);
+                    x3 = obj.blk.x{ib}(ip,jp);
+                    x4 = obj.blk.x{ib}(im,jp);
+    
+                    y1 = obj.blk.y{ib}(im,jm);
+                    y2 = obj.blk.y{ib}(ip,jm);
+                    y3 = obj.blk.y{ib}(ip,jp);
+                    y4 = obj.blk.y{ib}(im,jp);
+    
+                    area = 0.5*( (x1.*y2 + x2.*y3 + x3.*y4 + x4.*y1) ...
+                        - (x2.*y1 + x3.*y2 + x4.*y3 + x1.*y4) );
+    
+                    q = 0.25*(prop{ib}(im,jm) + ...
+                              prop{ib}(ip,jm) + ...
+                              prop{ib}(ip,jp) + ...
+                              prop{ib}(im,jp));
+    
+                    value(end) = value(end) + sum(q.*area.*r.mask{ib},"all");
+
+                end
+            end
+        end
+
         function value = area_integral(obj, prop, regions)
             value = [];
-            for r = [regions{:}]
-
-                im = r.is:r.ie-1;
-                ip = r.is+1:r.ie;
-                jm = r.js:r.je-1;
-                jp = r.js+1:r.je;
-                
-                x1 = obj.blk.x{r.nb}(im,jm);
-                x2 = obj.blk.x{r.nb}(ip,jm);
-                x3 = obj.blk.x{r.nb}(ip,jp);
-                x4 = obj.blk.x{r.nb}(im,jp);
-
-                y1 = obj.blk.y{r.nb}(im,jm);
-                y2 = obj.blk.y{r.nb}(ip,jm);
-                y3 = obj.blk.y{r.nb}(ip,jp);
-                y4 = obj.blk.y{r.nb}(im,jp);
-
-                area = 0.5*( (x1.*y2 + x2.*y3 + x3.*y4 + x4.*y1) ...
-                    - (x2.*y1 + x3.*y2 + x4.*y3 + x1.*y4) );
-
-                q = 0.25*(prop{r.nb}(im,jm) + ...
-                          prop{r.nb}(ip,jm) + ...
-                          prop{r.nb}(ip,jp) + ...
-                          prop{r.nb}(im,jp));
-
-                value(end+1) = sum(q.*area,"all");
-
+            if ~iscell(regions)
+                regions = {regions};
+            end
+            if isfield(regions{1}, 'mask')
+                value = obj.area_integral_masked(prop, regions);
+            else
+                for r = [regions{:}]
+    
+                    im = r.is:r.ie-1;
+                    ip = r.is+1:r.ie;
+                    jm = r.js:r.je-1;
+                    jp = r.js+1:r.je;
+                    
+                    x1 = obj.blk.x{r.nb}(im,jm);
+                    x2 = obj.blk.x{r.nb}(ip,jm);
+                    x3 = obj.blk.x{r.nb}(ip,jp);
+                    x4 = obj.blk.x{r.nb}(im,jp);
+    
+                    y1 = obj.blk.y{r.nb}(im,jm);
+                    y2 = obj.blk.y{r.nb}(ip,jm);
+                    y3 = obj.blk.y{r.nb}(ip,jp);
+                    y4 = obj.blk.y{r.nb}(im,jp);
+    
+                    area = 0.5*( (x1.*y2 + x2.*y3 + x3.*y4 + x4.*y1) ...
+                        - (x2.*y1 + x3.*y2 + x4.*y3 + x1.*y4) );
+    
+                    q = 0.25*(prop{r.nb}(im,jm) + ...
+                              prop{r.nb}(ip,jm) + ...
+                              prop{r.nb}(ip,jp) + ...
+                              prop{r.nb}(im,jp));
+    
+                    value(end+1) = sum(q.*area,"all");
+    
+                end
             end
 %             for i=1:obj.blk.blockdims(nb,1)-1
 %                 for j=1:obj.blk.blockdims(nb,2)-1
@@ -2483,6 +2666,93 @@ classdef DNS_case < handle
                 Ue = Unow(tripInd,inds(tripInd));
                 nu_k = nunow(tripInd);
                 value = Ue*obj.trip.scale/nu_k;
+            end
+        end
+
+        function [xc, yc] = getCellCentroids(obj)
+
+            for ib = 1:obj.NB
+                [ni,nj] = size(obj.blk.x{ib});
+                    
+                im = 1:ni-1;
+                ip = 2:ni;
+                jm = 1:nj-1;
+                jp = 2:nj;
+                
+                x1 = obj.blk.x{ib}(im,jm);
+                x2 = obj.blk.x{ib}(ip,jm);
+                x3 = obj.blk.x{ib}(ip,jp);
+                x4 = obj.blk.x{ib}(im,jp);
+
+                y1 = obj.blk.y{ib}(im,jm);
+                y2 = obj.blk.y{ib}(ip,jm);
+                y3 = obj.blk.y{ib}(ip,jp);
+                y4 = obj.blk.y{ib}(im,jp);
+
+                xc1 = cat(3, x1, x2, x3);
+                yc1 = cat(3, y1, y2, y3);
+                xc2 = cat(3, x1, x3, x4);
+                yc2 = cat(3, y1, y3, y4);
+                
+                xc1 = mean(xc1,3);
+                yc1 = mean(yc1,3);
+                xc2 = mean(xc2,3);
+                yc2 = mean(yc2,3);
+
+                a1 = 0.5*abs(x1.*(y2-y3) + x2.*(y3-y1) + x3.*(y1-y2));
+                a2 = 0.5*abs(x1.*(y3-y4) + x3.*(y4-y1) + x4.*(y1-y3));
+
+                xc{ib} = (a1.*xc1 + a2.*xc2)./(a1+a2);
+                yc{ib} = (a1.*yc1 + a2.*yc2)./(a1+a2);
+                                
+            end
+        end
+
+        function regions = getIntRegionsMask(obj, iplot)
+            if nargin < 2
+                iplot = false;
+            end
+            switch obj.topology
+                case 3
+                    xrangePreShock = [0.1 0.45];
+                    xrangePostShock = [0.55 0.9];
+                    yrange = [0 0.05];
+        
+                    regions = {};
+                    regions{1}.label = "Pre-shock";
+                    for ib = 1:obj.NB
+                        regions{1}.mask{ib} = obj.blk.x{ib} > xrangePreShock(1) ...
+                            & obj.blk.x{ib} < xrangePreShock(2)...
+                            & obj.blk.y{ib} > yrange(1) ...
+                            & obj.blk.y{ib} < yrange(2);
+                    end
+
+                    regions{2}.label = "Post-shock";
+                    for ib = 1:obj.NB
+                        regions{1}.mask{ib} = obj.blk.x{ib} > xrangePreShock(1) ...
+                            & obj.blk.x{ib} < xrangePostShock(2)...
+                            & obj.blk.y{ib} > yrange(1) ...
+                            & obj.blk.y{ib} < yrange(2);
+                    end
+                    
+            end
+            if iplot
+                ax = gca;
+                obj.kPlot(obj.meanFlow, 'diss','ax',ax,'label','$\phi$');
+                hold on
+                p = [];
+                for ir = 1:length(regions)
+                    nb = regions{ir}.nb;
+                    irange = regions{ir}.is:regions{ir}.ie;
+                    jrange = regions{ir}.js:regions{ir}.je;
+                    xline = [obj.blk.x{nb}(irange,jrange(1))' obj.blk.x{nb}(irange(end),jrange(2:end)) ...
+                        obj.blk.x{nb}(irange(end-1:-1:1),jrange(end))' obj.blk.x{nb}(irange(1), jrange(end-1:-1:1))];
+                    yline = [obj.blk.y{nb}(irange,jrange(1))' obj.blk.y{nb}(irange(end),jrange(2:end)) ...
+                        obj.blk.y{nb}(irange(end-1:-1:1),jrange(end))' obj.blk.y{nb}(irange(1), jrange(end-1:-1:1))];
+                    p(ir) = plot(ax, xline, yline, 'LineWidth', 1.5);
+                    labels{ir} = regions{ir}.label;
+                end
+                legend(p,[labels{:}]);
             end
         end
 

@@ -1,10 +1,14 @@
-function save_plot(dir, fname, save, fmt)
+
+function save_plot(dir, fname, save, fmt, draft)
 
     if nargin < 3 || isempty(save)
         save = true;
     end
     if nargin < 4
         fmt = 'png';
+    end
+    if nargin < 5
+        draft = false;
     end
     fmts = string(fmt);
     if save
@@ -22,8 +26,9 @@ function save_plot(dir, fname, save, fmt)
                     figure(f)
                     set(gca, 'Color', 'None');
                     plot2svg(fullfile(dir, [fname '.svg']), f, 'png')
-                case 'pdf'
+                case "pdf"
                     exportgraphics(f, fullfile(dir, [fname '.pdf']))
+                case "fig"
             end
         end
 %        savefig(f, fullfile(dir, [fname '.fig']))

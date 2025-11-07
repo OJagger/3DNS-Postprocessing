@@ -102,6 +102,18 @@ classdef DNS_channel < DNS_case
 
         end
 
+        function mask = getSquareMask(obj, xrange, yrange)
+            
+            [xc, yc] = obj.getCellCentroids;
+            for ib = 1:obj.NB
+
+                mask{ib} = xc{ib} > xrange(1) ...
+                    & xc{ib} < xrange(2)...
+                    & yc{ib} > yrange(1) ...
+                    & yc{ib} < yrange(2);
+            end
+        end
+
         function split_domain(obj, newCase)
             newFlow = volFlow();
             newFlow.flowpath = newCase.casepath;

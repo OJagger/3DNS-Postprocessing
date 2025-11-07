@@ -15,7 +15,7 @@ NumStacksPerGroup = size(stackData, 2);
 groupBins = 1:NumGroupsPerAxis;
 MaxGroupWidth = 0.65; % Fraction of 1. If 1, then we have all bars in groups touching
 groupOffset = MaxGroupWidth/NumStacksPerGroup;
-figure
+% figure
     hold on; 
 for i=1:NumStacksPerGroup
     Y = squeeze(stackData(:,i,:));

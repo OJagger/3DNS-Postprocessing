@@ -7,11 +7,11 @@ classdef spanAveSlice < aveSlice
     end
 
     methods
-        function obj = spanAveSlice(casedir,blk,gas,bcs,casetype,nMean)
+        function obj = spanAveSlice(blk,gas,bcs,casedir,casetype,nMean)
             obj@aveSlice(blk, gas, bcs);
             disp('Constructing spanAveSlice')
             
-            if nargin > 0
+            if nargin > 3
                 
                 obj.nMean = nMean;
 

@@ -35,6 +35,7 @@ classdef flowSlice < handle
         s;              % Entropy ( cp*log(T/300) - R*log(p/1e5) )
         sfunc;
         ros;            % Entropy per unit volume
+        rus;            % Axial entropy flux
         vel;            % Velocity
         mu;             % Viscosity
         nu;             % Kinematic viscosity
@@ -45,7 +46,8 @@ classdef flowSlice < handle
         schlieren;      % |grad(ro)|/ro
         cellSize;
         St;
-        St_an              % Traceless strain
+        St_iso;         % Isotropic strain
+        St_an;           % Traceless strain
         S_an_mag;       % Magnitude of anisotropic componant of strain tensor
         local_cfl;
         wallDist;       % Distance from wall
@@ -97,6 +99,10 @@ classdef flowSlice < handle
             value = obj.get_ros;
         end
 
+        function value = get.rus(obj)
+            value = obj.get_rus;
+        end
+
         function obj = set.ros(obj, value)
             obj.set_ros(value)
         end
@@ -137,6 +143,15 @@ classdef flowSlice < handle
             for nb = 1:obj.NB
                 value{nb} = obj.ro{nb}.*(obj.gas.cp*log(Tnow{nb}/obj.bcs.Toin) - ...
                     obj.gas.cp*(1-1/obj.gas.gam)*log(pnow{nb}/obj.bcs.Poin));
+            end
+        end
+
+        function value = get_rus(obj)
+            value = cell(1,obj.NB);
+            unow = obj.u;
+            rosnow = obj.ros;
+            for nb = 1:obj.NB
+                value{nb} = unow{nb}.*rosnow{nb};
             end
         end
 
@@ -258,7 +273,7 @@ classdef flowSlice < handle
 
         function value = get.cellSize(obj)
             fprintf('Calculating Cell Sizes\n')
-            dz = obj.blk.span/(obj.blk.nk{1}-1);
+            dz = obj.blk.span/(obj.blk.nk-1);
             
             value = {};
             for ib = 1:obj.NB
@@ -325,6 +340,23 @@ classdef flowSlice < handle
             end
         end
         
+        function value = get.St_iso(obj)
+
+            S = obj.St;
+
+            for ib = 1:obj.NB
+
+                tr = S{ib}(:,:,1,1) + S{ib}(:,:,2,2) + S{ib}(:,:,3,3);
+
+                St = zeros(size(S{ib}));
+                for i=1:3
+                    St(:,:,i,i) = tr/3;
+                end
+
+                value{ib} = St;
+
+            end
+        end
 
         function value = get.St_an(obj)
 
@@ -340,19 +372,6 @@ classdef flowSlice < handle
                 end
 
                 value{ib} = St;
-
-%                 [DUDX,DUDY] = gradHO(obj.blk.x{ib},obj.blk.y{ib},obj.u{ib});
-%                 [DVDX,DVDY] = gradHO(obj.blk.x{ib},obj.blk.y{ib},obj.v{ib});
-% 
-%                 %Traceless strain tensor
-%                 S = zeros(obj.blk.blockdims(ib,1),obj.blk.blockdims(ib,2),3,3);
-%                 
-%                 S(:,:,1,1) = 2*DUDX/3 - DVDY/3;
-%                 S(:,:,2,2) = 2*DVDY/3 - DUDX/3;
-%                 S(:,:,3,3) = -(DUDX+DVDY)/3;
-% 
-%                 S(:,:,1,2) = 0.5*(DUDY+DVDX);
-%                 S(:,:,2,1) = S(:,:,1,2);
 
             end
         end

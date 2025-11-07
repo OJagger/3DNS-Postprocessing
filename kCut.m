@@ -246,10 +246,14 @@ classdef kCut < flowSlice
             %OGRIDPROP Construct array of property in o grid for one surface
             %of blade
 
-            propnow = obj.(prop);
+            if isstring(prop) || ischar(prop)
+                propnow = obj.(prop);
+            else
+                propnow = prop;
+            end
+
             if ~iscell(propnow)
-            
-            %if any(strcmp(["U","dsdy","yBL","yplus"], prop))
+                %if any(strcmp(["U","dsdy","yBL","yplus"], prop))
                 blfield = propnow;
             else
                 blfield = [];
@@ -547,17 +551,14 @@ classdef kCut < flowSlice
             value = zeros(size(q));
             
             for i=1:size(q,1)
-
                 n = obj.n(:,i);
-                R = [n(2) -n(1)   0; ...
-                     n(1)  n(2)   0; ...
-                     0     0      1];
+                R = [n(2) -n(1)  0; ...
+                     n(1)  n(2)  0; ...
+                     0     0     1];
 
                 for j=1:size(q,2)
                     value(i,j,:,:) = R*squeeze(q(i,j,:,:))*R';
                 end
-
-
             end
 
         end

@@ -98,6 +98,7 @@ classdef aveSlice < kCut
         S_aligned_t;
         bubble_edge;
         bubble_edge_ind;
+        invariants;
     end
 
     methods
@@ -2252,6 +2253,30 @@ classdef aveSlice < kCut
             +  squeeze(tau_aligned(:,:,2,1)).*squeeze(St_aligned(:,:,2,1));
         end
 
+        function value = get.invariants(obj)
+
+            tau = obj.Rij;
+
+            for ib =1:obj.NB
+                [ni, nj] = size(obj.blk.x{ib});
+                v = zeros(ni,nj,3);
+                del = [];
+                del(1,1,:,:) = eye(3);
+                del = repmat(del,ni,nj,1,1);
+                tr = sum(sum(tau{ib}.*del,4), 3);
+                B = tau{ib}./tr - (1/3)*del;
+                for i= 1:ni
+                    for j = 1:nj
+                        A = squeeze(B(i,j,:,:));
+                        v(i,j,1) = trace(A);
+                        v(i,j,2) = 0.5 * (trace(A)^2 - trace(A^2));
+                        v(i,j,3) = det(A);
+                    end
+                end
+                value{ib} = v;
+            end
+        end
+    
         function sol = run_mrchbl(obj, xstart, path, xtrip, xmatch)
 
             Kcorr = 5.6;
@@ -2510,13 +2535,17 @@ classdef aveSlice < kCut
 
         end
 
-        function [x, y, value] = get_BL_streamline(obj, xseed, yseed, prop)
+        function [x, y, value] = get_BL_streamline(obj, xseed, yseed, prop, n)
 
             if nargin < 4 || isempty(prop)
                 int = false;
             else
                 int = true;
                 prop = obj.oGridProp(prop);
+            end
+
+            if nargin < 5 || isempty(n)
+                n = 250;
             end
 
             value = [];
@@ -2539,7 +2568,7 @@ classdef aveSlice < kCut
 
             xin = obj.blk.x{obj.blk.inlet_blocks{1}(1)}(1,1);
             xout = obj.blk.x{obj.blk.outlet_blocks{1}(1)}(end,1);
-            ds = (xout-xin)/250;
+            ds = (xout-xin)/n;
 
             % March backwards
             xv = reshape(obj.xO,[],1);

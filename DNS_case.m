@@ -1001,7 +1001,7 @@ classdef DNS_case < handle
                
             colorbar('off');
             cb = colorbar;
-            if string(prop) == "overlay"
+            if ~iscell(prop) && string(prop) == "overlay"
                 if size(lims, 1) == 2
                     caxis(ax,lims(2, :));
                 else
@@ -1017,7 +1017,7 @@ classdef DNS_case < handle
                 cb.Label.String = label;
             end
             
-            if string(prop) == "overlay" 
+            if ~iscell(prop) && string(prop) == "overlay" 
                 axes(ax);
                 axis off
                 area = axis(ax);
